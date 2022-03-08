@@ -12,6 +12,7 @@
 #define FIND 1
 #define EXIT 2
 #define HELP 3
+#define FILE_NUM 1023
 
 /*
 typedef struct Print_File {
@@ -75,7 +76,24 @@ void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){
 }
 
 void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 조회), realpath(상대경로=>절대경로)
+	char REAL_PATH[INPUT_SIZE];
+	int index;
+	if(realpath(PATH,REAL_PATH)==NULL){
+		printf("(None)");
+		return;
+	}
 	printf("Index Size Mode        Blocks Links UID  GID  Access          Change        Modify         Path\n");
+	index=find_dfs(FILENAME, REAL_PATH, index);
+	if(index==0) printf("(None)");
+	else find_option();
+	return;
+}
+
+int find_dfs(char *FILENAME, char *PATH, int index){
+}
+
+void find_option(){
+	printf(">> ");
 }
 
 int command_classify(char *result){
