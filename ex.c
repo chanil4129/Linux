@@ -1,15 +1,22 @@
 #include <stdio.h>
 #include <string.h>
 
+int find_dfs(int index){
+	return 1;
+}
+
+void aa(char *a){
+}
+void find_command(char *file){
+	aa(file);
+}
 int main(void){
-	char result[10];
-	char *k="fi";
-	result[0]='f';
-	result[1]='i';
-	//result[2]='\0';
-	printf("index3 : %d\n",result[2]);
-	printf("kindex3: %d\n",k[2]);
-	printf("%d\n",strcmp(result,k));
+	char *file;
+	int index=0;
+	index=find_dfs(index);
+	printf("%d\n",index);
+	find_command(file);
+
 	return 0;
 }
 
