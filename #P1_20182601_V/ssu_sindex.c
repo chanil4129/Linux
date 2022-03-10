@@ -34,6 +34,8 @@ struct timeval start_time,end_time; //Runtime calculate
 int command_classify(char *);
 void find_command(char *, char *);
 void division_FILENAME_PATH(char *, char *, char *);
+int find_dfs(char *, char *, int);
+void find_option();
 //var dir_find();
 //var file_find();
 void exit_command();
@@ -66,7 +68,7 @@ int main(void) {
     return 0;
 }
 
-void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){
+void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){	//divide FILENAME and PATH
 	int i=0,j=0;	//i:"find" except
 	while(user_input[i+4]!='/') FILENAME[i]=user_input[i], i++;
 	FILENAME[i+1]='\0';
@@ -77,9 +79,9 @@ void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){
 
 void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 조회), realpath(상대경로=>절대경로)
 	char REAL_PATH[INPUT_SIZE];
-	int index;
+	int index=0;
 	if(realpath(PATH,REAL_PATH)==NULL){
-		printf("(None)");
+		printf("(None)");	//modify=>exception
 		return;
 	}
 	printf("Index Size Mode        Blocks Links UID  GID  Access          Change        Modify         Path\n");
@@ -90,13 +92,30 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 }
 
 int find_dfs(char *FILENAME, char *PATH, int index){
+	struct stat file;
+	char *rwx[]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
+	if(stat(FILENAME,&file)==-1){
+		fprintf(stderr,"stat error");
+	}
+	printf("%6d",index++);
+	printf("%5ld",(long)file.st_size);
+	S_ISDIR(file.st_mode) ? printf("d") : printf("-");
+	printf("%s%s%s ",rwx[file.st_mode>>6],rwx[file.st_mode>>3],rwx[file.st_mode]);
+	printf("%7lld",(long long)file.st_blocks);
+	printf("%6ld",(long)file.st_nlink);
+	printf("%5ld",(long)file.st_uid);
+	printf("%5ld",(long)file.st_gid);
+	printf("%s  ",file.st_atime);
+	printf("%s  ",file.st_ctime);
+	printf("%s  ",file.st_mtime);
+	printf("%s\n",PATH);
 }
 
 void find_option(){
 	printf(">> ");
 }
 
-int command_classify(char *result){
+int command_classify(char *result){	//classify command
 	int c;
 	int i=0;
 	while((c=getc(stdin))!='\n'){
@@ -113,7 +132,7 @@ int command_classify(char *result){
 //var dir_find(){}
 //var file_find(){}
 
-void exit_command(void){
+void exit_command(void){	//exit command
     double Runtime_sec,Runtime_usec;
     gettimeofday(&end_time,NULL); //timer end
     Runtime_sec=end_time.tv_sec-start_time.tv_sec;
@@ -122,7 +141,7 @@ void exit_command(void){
     exit(0);
 }
 
-void help_command(void){
+void help_command(void){	//help command
     printf("Usage:\n\t> find [FILENAME] [PATH]\n\t\t>> [INDEX] [OPTION ...]\n\t> help\n\t exit\n\n");
     printf("\t[OPTION ...]");
     printf("\n\t q : report only when files differ");
