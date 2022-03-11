@@ -35,6 +35,7 @@ struct timeval start_time,end_time; //Runtime calculate
 int command_classify(char *);
 void find_command(char *, char *);
 void division_FILENAME_PATH(char *, char *, char *);
+int find_dfs(char *, char *, int);
 int print_file(char *, char *, int);
 void find_option();
 //var dir_find();
@@ -89,10 +90,59 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 		printf("(None)\n");	//modify=>exception
 		return;
 	}
-	index=print_file(FILENAME, REAL_PATH, index);
+	printf("F:%s\nP:%s\n",FILENAME,REAL_PATH);
+	index=find_dfs(FILENAME, REAL_PATH, index);
 	if(index==0) printf("(None)\n");
 	else find_option();
 	return;
+}
+
+int find_dfs(char *FILENAME, char *PATH, int index){
+	struct stat file;
+	struct tm *t;
+	char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
+	DIR *dir_ptr=NULL;
+	struct dirent *file_ptr=NULL;
+	struct dirent **namelist;
+	char *lowpath;
+	int count;
+
+	if((count=scandir(PATH,&namelist,NULL,alphasort))==-1){
+		return index;
+	}
+	for(int i=0;i<count;i++){
+		lowpath=strcpy(PATH,namelist[i]->d_name);
+		//if(realpath(strcpy(PATH,namelist[i]->d_name),lowpath)==NULL) return index;
+		if((dir_ptr=opendir(lowpath))==NULL) continue;
+		if(strcmp(namelist[i]->d_name,"..")) continue;
+		while((file_ptr=readdir(dir_ptr))!=NULL){
+				if(strcmp(file_ptr->d_name,FILENAME)){
+					if(lstat(file_ptr->d_name,&file)==0){
+						if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
+						printf("%-6d",index++);
+						printf("%-5ld",(long)file.st_size);
+						S_ISDIR(file.st_mode) ? printf("d") : printf("-");
+						printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
+						printf("%-7lld",(long long)file.st_blocks);
+						printf("%-6ld",(long)file.st_nlink);
+						printf("%-5ld",(long)file.st_uid);
+						printf("%-5ld",(long)file.st_gid);
+						t=localtime(&file.st_atime);
+						printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+						t=localtime(&file.st_ctime);
+						printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+						t=localtime(&file.st_mtime);
+						printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+						printf("%s\n",lowpath);
+					}
+				}
+		}
+	}
+	index=find_dfs(FILENAME,lowpath,index);
+	for(int i=0;i<count;i++) free(namelist[i]);
+	free(namelist);
+	closedir(dir_ptr);
+	return index;
 }
 
 int print_file(char *FILENAME, char *PATH, int index){
