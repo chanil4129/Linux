@@ -35,7 +35,7 @@ struct timeval start_time,end_time; //Runtime calculate
 int command_classify(char *);
 void find_command(char *, char *);
 void division_FILENAME_PATH(char *, char *, char *);
-int find_dfs(char *, char *, int);
+int print_file(char *, char *, int);
 void find_option();
 //var dir_find();
 //var file_find();
@@ -70,7 +70,13 @@ int main(void) {
 
 void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){	//divide FILENAME and PATH
 	int i=4,j=0;	//i:"find" except
-	while(user_input[i]!='/') FILENAME[j]=user_input[i],i++,j++;
+	while(user_input[i]!='/'){
+		if(user_input[i]=='\0'){//not input path
+			fprintf(stderr,"none path");
+			return ;
+		}
+	   	FILENAME[j]=user_input[i],i++,j++;
+	}
 	FILENAME[j]='\0',j=0;
 	while(user_input[i]!='\0') PATH[j]=user_input[i],i++,j++;
 	PATH[j]='\0';
@@ -83,38 +89,36 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 		printf("(None)\n");	//modify=>exception
 		return;
 	}
-	printf("Filename: %s\nPath: %s\n",FILENAME,PATH);
-	printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n");
-	index=find_dfs(FILENAME, REAL_PATH, index);
+	index=print_file(FILENAME, REAL_PATH, index);
 	if(index==0) printf("(None)\n");
 	else find_option();
 	return;
 }
 
-int find_dfs(char *FILENAME, char *PATH, int index){
+int print_file(char *FILENAME, char *PATH, int index){
 	struct stat file;
 	struct tm *t;
 	char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
-	if(stat(FILENAME,&file)==-1){
-		fprintf(stderr,"stat error");
+	if(stat(FILENAME,&file)==0){
+		if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
+		printf("%-6d",index++);
+		printf("%-5ld",(long)file.st_size);
+		S_ISDIR(file.st_mode) ? printf("d") : printf("-");
+		printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
+		printf("%-7lld",(long long)file.st_blocks);
+		printf("%-6ld",(long)file.st_nlink);
+		printf("%-5ld",(long)file.st_uid);
+		printf("%-5ld",(long)file.st_gid);
+		t=localtime(&file.st_atime);
+		printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+		t=localtime(&file.st_ctime);
+		printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+		t=localtime(&file.st_mtime);
+		printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+		printf("%s\n",PATH);
+		index++;
 	}
-	printf("%-6d",index++);
-	printf("%-5ld",(long)file.st_size);
-	S_ISDIR(file.st_mode) ? printf("d") : printf("-");
-	printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
-	printf("%-7lld",(long long)file.st_blocks);
-	printf("%-6ld",(long)file.st_nlink);
-	printf("%-5ld",(long)file.st_uid);
-	printf("%-5ld",(long)file.st_gid);
-	t=localtime(&file.st_atime);
-	printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-	t=localtime(&file.st_ctime);
-	printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-	t=localtime(&file.st_mtime);
-	printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-	printf("%s\n",PATH);
-
-	return 1;//temporary
+	return index;
 }
 
 void find_option(){
