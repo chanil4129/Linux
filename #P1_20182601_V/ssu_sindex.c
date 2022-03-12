@@ -35,8 +35,8 @@ struct timeval start_time,end_time; //Runtime calculate
 int command_classify(char *);
 void find_command(char *, char *);
 void division_FILENAME_PATH(char *, char *, char *);
+int target_file(char *, char *, int);
 int find_dfs(char *, char *, int);
-int print_file(char *, char *, int);
 void find_option();
 //var dir_find();
 //var file_find();
@@ -90,6 +90,7 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 		printf("(None)\n");	//modify=>exception
 		return;
 	}
+	index=target_file(FILENAME, REAL_PATH, index);
 	index=find_dfs(FILENAME, REAL_PATH, index);
 	if(index==0) printf("(None)\n");
 	else find_option();
@@ -103,11 +104,9 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	DIR *dir_ptr=NULL;
 	struct dirent *file_ptr=NULL;
 	struct dirent **namelist;
-	char lowpath[10000];
-	char PATH_FILE[10000];
+	char lowpath[200000];
+	char PATH_FILE[200000];
 	int count,str_length;
-
-	printf("PATH : %s\n",PATH);
 
 	if((count=scandir(PATH,&namelist,NULL,alphasort))==-1){
 		fprintf(stderr,"scandir error\n");
@@ -117,57 +116,54 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 		memset(lowpath,0,sizeof(lowpath));
 		if(!strcmp(namelist[i]->d_name,"..")) continue;	
 		if(!strcmp(namelist[i]->d_name,".")) continue;
-//		if(!strcmp(namelist[i]->d_name,".")) strcpy(lowpath,PATH);
+		if(namelist[i]->d_name[0]=='.') continue;
+		if(!strcmp(namelist[i]->d_name,"X11")) continue;	
 		else {
 			str_length=strlen(PATH);
 			if(PATH[str_length-1]=='/') {
 				strcpy(lowpath,PATH);
-				strcat(lowpath,namelist[i]->d_name);
 			}			
 			else {
 				strcpy(lowpath,PATH);
 				strcat(lowpath,"/");
-				strcat(lowpath,namelist[i]->d_name);
 			}
+			strcat(lowpath,namelist[i]->d_name);
 		}
-		printf("%s\n",lowpath);
-//		if(realpath(lowpath,PATH)==NULL){
-//			fprintf(stderr,"to realpath error");
-//			return index;
-//		}
+
 		if((dir_ptr=opendir(lowpath))==NULL) continue;
-		while((file_ptr=readdir(dir_ptr))!=NULL){
-			memset(PATH_FILE,0,sizeof(PATH_FILE));
-			strcpy(PATH_FILE,lowpath);
-			strcat(PATH_FILE,FILENAME);
-			if(lstat(PATH_FILE,&file)==0){
-				if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
-				printf("%-6d",index++);
-				printf("%-5ld",(long)file.st_size);
-				S_ISDIR(file.st_mode) ? printf("d") : printf("-");
-				printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
-				printf("%-7lld",(long long)file.st_blocks);
-				printf("%-6ld",(long)file.st_nlink);
-				printf("%-5ld",(long)file.st_uid);
-				printf("%-5ld",(long)file.st_gid);
-				t=localtime(&file.st_atime);
-				printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-				t=localtime(&file.st_ctime);
-				printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-				t=localtime(&file.st_mtime);
-				printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
-				printf("%s\n",lowpath);
-			}
+		while((file_ptr=readdir(dir_ptr))==NULL){
+			fprintf(stderr,"readdir error\n");
 		}
+		memset(PATH_FILE,0,sizeof(PATH_FILE));
+		strcpy(PATH_FILE,lowpath);
+		strcat(PATH_FILE,"/");
+		strcat(PATH_FILE,FILENAME);
+		if(lstat(PATH_FILE,&file)==0){
+			printf("%-6d",index++);
+			printf("%-5ld",(long)file.st_size);
+			S_ISDIR(file.st_mode) ? printf("d") : printf("-");
+			printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
+			printf("%-7lld",(long long)file.st_blocks);
+			printf("%-6ld",(long)file.st_nlink);
+			printf("%-5ld",(long)file.st_uid);
+			printf("%-5ld",(long)file.st_gid);
+			t=localtime(&file.st_atime);
+			printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+			t=localtime(&file.st_ctime);
+			printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+			t=localtime(&file.st_mtime);
+			printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+			printf("%s\n",lowpath);
+		}
+		closedir(dir_ptr);
 		index=find_dfs(FILENAME,lowpath,index);
 	}
 	for(int i=0;i<count;i++) free(namelist[i]);
 	free(namelist);
-//	closedir(dir_ptr);
 	return index;
 }
 
-int print_file(char *FILENAME, char *PATH, int index){
+int target_file(char *FILENAME, char *PATH, int index){
 	struct stat file;
 	struct tm *t;
 	char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
@@ -188,7 +184,6 @@ int print_file(char *FILENAME, char *PATH, int index){
 		t=localtime(&file.st_mtime);
 		printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
 		printf("%s\n",PATH);
-		index++;
 	}
 	return index;
 }
