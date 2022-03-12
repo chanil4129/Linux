@@ -115,9 +115,11 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	for(int i=0;i<count;i++){
 		memset(lowpath,0,sizeof(lowpath));
 		if(!strcmp(namelist[i]->d_name,"..")) continue;	
-		if(!strcmp(namelist[i]->d_name,".")) continue;
-		if(namelist[i]->d_name[0]=='.') continue;
 		if(!strcmp(namelist[i]->d_name,"X11")) continue;	
+		if(!strcmp(namelist[i]->d_name,".")) continue;
+		if(!strcmp(namelist[i]->d_name,"dev")) continue;
+		if(namelist[i]->d_name[0]=='.') continue;
+		
 		else {
 			str_length=strlen(PATH);
 			if(PATH[str_length-1]=='/') {
@@ -167,7 +169,19 @@ int target_file(char *FILENAME, char *PATH, int index){
 	struct stat file;
 	struct tm *t;
 	char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
-	if(stat(FILENAME,&file)==0){
+	char PATH_FILE[200000];
+	DIR *dir_ptr=NULL;
+	struct dirent *file_ptr=NULL;
+
+	if((dir_ptr=opendir(PATH))==NULL) {
+		fprintf(stderr,"opendir error");
+		return index;
+	}
+	while((file_ptr=readdir(dir_ptr))==NULL) fprintf(stderr,"readdir error");
+	strcpy(PATH_FILE,PATH);
+	strcat(PATH_FILE,"/");
+	strcat(PATH_FILE,FILENAME);
+	if(lstat(PATH_FILE,&file)==0){
 		if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
 		printf("%-6d",index++);
 		printf("%-5ld",(long)file.st_size);
