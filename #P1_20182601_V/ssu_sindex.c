@@ -23,7 +23,12 @@ void division_FILENAME_PATH(char *, char *, char *);
 int target_file(char *, char *, int);
 int find_dfs(char *, char *, int);
 void print_file_info(char *,struct stat, struct tm *,int);
-void find_option();
+int find_index();
+void find_only_index(int);
+void find_option_q(int);
+void find_option_s(int);
+void find_option_i(int);
+void find_option_r(int);
 void exit_command();
 void help_command();
 
@@ -59,7 +64,7 @@ void division_FILENAME_PATH(char *user_input, char *FILENAME, char *PATH){	//div
 	FILENAME[j]='\0',j=0,i++;
 	while(user_input[j]!='\0') PATH[j]=user_input[i],i++,j++;
 	PATH[j]='\0';
-	printf("F: %s\nP: %s\n",FILENAME,PATH);
+//	printf("F: %s\nP: %s\n",FILENAME,PATH);
 }
 
 void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 조회), realpath(상대경로=>절대경로)
@@ -68,13 +73,13 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 	int realpath_length,path_length;
 
 	 if(realpath(PATH,REAL_PATH)==NULL){
-		printf("(None)\n");	//modify=>exception
+		fprintf(stderr,"(None)\n");	//modify=>exception
 		return;
 	}
 	index=target_file(FILENAME, REAL_PATH, index);
 	index=find_dfs(FILENAME, REAL_PATH, index);
 	if(index==1) printf("(None)\n");
-	else find_option();
+	else while(!find_index(index));
 	return;
 }
 
@@ -177,17 +182,55 @@ int target_file(char *FILENAME, char *PATH, int index){
 	return index;
 }
 
-void find_option(){
-	printf(">> ");
+int find_index(int index_size){
+	char index[INPUT_SIZE];
+	char input[INPUT_SIZE];
+	char option='\0';
+	int index_num;
+	char c;
+	int i=0;
 	
+	printf(">> ");
+	while((c=getc(stdin))!='\n') input[i]=c,i++;
+	input[i]='\0',i=0;
+	while(input[i]!='\0') {
+		index[i]=input[i],i++;
+		if(input[i]==' '){
+			option=input[i+1];
+			break;
+		}
+	}
+	index[i]='\0';
+	for(i=0;index[i]!='\0';i++) if(index[i]<'0'||index[i]>'9') return 0;
+	index_num=atoi(index);
+	if(index_num>=index_size) {
+		fprintf(stderr,"index size error\n");
+		return 0;
+	}
+//	printf("index:%d\noption:%c\n",index_num,option);
+	if(option=='\0') find_only_index(index_num);
+	else if(option=='q') find_option_q(index_num);
+	else if(option=='s') find_option_s(index_num);
+	else if(option=='i') find_option_i(index_num);
+	else if(option=='r') find_option_r(index_num);
+	else {
+	fprintf(stderr,"your type option is non_option\n");
+	return 0;
+	}
+	return 1;
 }
+
+void find_only_index(int index){printf("only index\n");}
+void find_option_q(int index){printf("2\n");}
+void find_option_s(int index){printf("3\n");}
+void find_option_i(int index){}
+void find_option_r(int index){}
 
 int command_classify(char *result){	//classify command
 	int c;
 	int i=0;
-	while((c=getc(stdin))!='\n'){
-		result[i]=c, i++;	//command store
-	}
+	while((c=getc(stdin))!='\n') result[i]=c, i++;	//command store
+	
 	result[i]='\0';
 	if(result[0]=='\0') return ENTER;
 	else if(result[0]=='f'&&result[1]=='i'&&result[2]=='n'&&result[3]=='d') return FIND;
