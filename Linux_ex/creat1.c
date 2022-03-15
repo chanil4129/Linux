@@ -1,20 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <unistd.h>
 #include <fcntl.h>
 
 int main(void){
-	char *filename="ssu_test.txt";
+	char *fname="ssu_test.txt";
 	int fd;
 
-	if((fd=creat(filename,0666))<0){
-		fprintf(stderr,"error : %s",filename);
+	if((fd=creat(fname,0666))<0){
+		fprintf(stderr,"creat error for %s\n",fname);
 		exit(1);
 	}
 	else{
-		printf("Finlename: %s, Descriptor: %d",filename,fd);
-		exit(0);
+		printf("Success!\nFilename : %s\nDescriptor : %d\n",fname,fd);
+		close(fd);
 	}
-
+	exit(0);
 }

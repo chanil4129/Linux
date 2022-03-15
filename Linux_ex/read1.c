@@ -1,28 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "ssu_employee.h"
 
 int main(int argc, char *argv[]){
 	struct ssu_employee record;
-	int record_num;
 	int fd;
+	int record_num;
 
 	if(argc<2){
 		fprintf(stderr,"Usage : %s file\n",argv[0]);
 		exit(1);
 	}
-
-	if((fd=open(argv[1],O_RDONLY)<0)){
-		fprintf(stderr,"open error %s\n",argv[1]);
+	if((fd=open(argv[1],O_RDONLY))<0){
+		fprintf(stderr,"open error for %s\n",argv[1]);
 		exit(1);
 	}
-
 	while(1){
-		printf("Enter record number: ");
+		printf("Enter record number : ");
 		scanf("%d",&record_num);
 
 		if(record_num<0) break;
@@ -32,13 +28,9 @@ int main(int argc, char *argv[]){
 			exit(1);
 		}
 
-		if(read(fd,(char *)&record,sizeof(record))>0)
-			printf("Employee: %s ,  Salary: %d\n",record.name,record.salary);
-		else
-			printf("Record %d not found\n",record_num);
+		if(read(fd,(char *)&record,sizeof(record))>0) printf("Employee : %s Salary : %d\n",record.name,record.salary);
+		else printf("Record %d not found\n",record_num);
 	}
-
 	close(fd);
 	exit(0);
 }
-	

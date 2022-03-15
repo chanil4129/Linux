@@ -9,6 +9,7 @@
 #include <time.h>
 
 #define INPUT_SIZE 1023
+#define PATH_SIZE 10000
 #define ENTER 0
 #define FIND 1
 #define EXIT 2
@@ -16,6 +17,8 @@
 #define FILE_NUM 1023
 
 struct timeval start_time,end_time; //Runtime calculate
+char Index_path[FILE_NUM][PATH_SIZE];
+int path_index;
 
 int command_classify(char *);
 void find_command(char *, char *);
@@ -89,8 +92,8 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	DIR *dir_ptr=NULL;
 	struct dirent *file_ptr=NULL;
 	struct dirent **namelist;
-	char lowpath[200000];
-	char PATH_FILE[200000];
+	char lowpath[PATH_SIZE];
+	char PATH_FILE[PATH_SIZE];
 	int count,str_length;
 
 	if((count=scandir(PATH,&namelist,NULL,alphasort))==-1){
@@ -155,6 +158,8 @@ void print_file_info(char *PATH,struct stat file, struct tm *t,int index){
 	t=localtime(&file.st_mtime);
 	printf("%02d-%02d-%02d %02d:%02d:%02d ",t->tm_year-100,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
 	printf("%s\n",PATH);
+
+	strcpy(Index_path[path_index++],PATH);
 	return;
 
 }
@@ -166,6 +171,8 @@ int target_file(char *FILENAME, char *PATH, int index){
 	DIR *dir_ptr=NULL;
 	struct dirent *file_ptr=NULL;
 
+	for(int i=0;i<path_index;i++) memset(Index_path[i],0,sizeof(Index_path[i]));
+	path_index=0;
 	if((dir_ptr=opendir(PATH))==NULL) {
 		fprintf(stderr,"opendir error");
 		return index;
@@ -179,6 +186,7 @@ int target_file(char *FILENAME, char *PATH, int index){
 		print_file_info(PATH,file,t,index);
 		index++;
 	}
+	closedir(dir_ptr);
 	return index;
 }
 
@@ -220,11 +228,17 @@ int find_index(int index_size){
 	return 1;
 }
 
-void find_only_index(int index){printf("only index\n");}
-void find_option_q(int index){printf("2\n");}
-void find_option_s(int index){printf("3\n");}
-void find_option_i(int index){}
-void find_option_r(int index){}
+void find_only_index(int index){
+
+}
+void find_option_q(int index){
+}
+void find_option_s(int index){
+}
+void find_option_i(int index){
+}
+void find_option_r(int index){
+}
 
 int command_classify(char *result){	//classify command
 	int c;

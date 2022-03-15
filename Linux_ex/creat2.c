@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -9,14 +7,14 @@ int main(void){
 	char *fname="ssu_test.txt";
 	int fd;
 
-	if((fd=creat(fname,0066))<0){
-		fprintf(stderr,"error %s",fname);
+	if((fd=creat(fname,0666))<0){
+		fprintf(stderr,"creat error for %s\n",fname);
 		exit(1);
 	}
 	else{
 		close(fd);
 		fd=open(fname,O_RDWR);
-		printf("<%s>",fname);
+		printf("Succeeded!\n<%s> is new readable and writable\n",fname);
 	}
 	exit(0);
 }
