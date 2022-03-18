@@ -2,13 +2,11 @@
 #include <stdlib.h> //realpath
 #include <sys/stat.h> //stat
 #include <sys/types.h>
-#include <fcntl.h>
 #include <unistd.h> 
 #include <dirent.h> //scandir
 #include <sys/time.h>   //gettimeofday
 #include <string.h>	//strcmp
 #include <time.h>
-#include <stdbool.h>
 
 #define INPUT_SIZE 1023
 #define PATH_SIZE 10000
@@ -18,10 +16,6 @@
 #define HELP 3
 #define FILE_NUM 1023
 
-struct file_content {
-	int line[INPUT_SIZE];
-	char buf[INPUT_SIZE];
-};
 struct timeval start_time,end_time; //Runtime calculate
 char Index_file[FILE_NUM][PATH_SIZE];
 int file_index;
@@ -30,15 +24,11 @@ long dir_weight;
 int command_classify(char *);
 void find_command(char *, char *);
 void division_FILENAME_PATH(char *, char *, char *);
+int target_file(char *, char *, int);
 int find_dfs(char *, char *, int);
-void print_file_info(char *,struct stat, struct tm *,int);
+void print_file_info(char *,char *,struct stat, struct tm *,int);
 int find_index();
 void find_only_index(int);
-void file_diff(int,int);
-void dir_diff(int);
-//char* file_to_buf(int,int*);
-void file_to_buf(int,int*,char *);
-void row(struct file_content ,int,char *);
 void find_option_q(int);
 void find_option_s(int);
 void find_option_i(int);
@@ -90,6 +80,7 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 		fprintf(stderr,"(None)\n");	//modify=>exception
 		return;
 	}
+	index=target_file(FILENAME, REAL_PATH, index);
 	dir_weight=0;
 	index=find_dfs(FILENAME, REAL_PATH, index);
 	if(index==1) printf("(None)\n");
@@ -99,8 +90,7 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 
 int find_dfs(char *FILENAME, char *PATH, int index){
 	struct stat file;
-	struct stat d_file;
-	struct stat is_dir;
+	//struct stat is_dir;
 	struct tm *t;
 	DIR *dir_ptr=NULL;
 	struct dirent *file_ptr=NULL;
@@ -109,21 +99,6 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	char PATH_FILE[PATH_SIZE];
 	int count,str_length;
 
-	if(!strcmp(PATH,"/")){
-	   	strcpy(PATH_FILE,"/");
-		strcat(PATH_FILE,FILENAME);
-	}
-	else{
-		strcpy(PATH_FILE,PATH);
-		strcat(PATH_FILE,"/");
-		strcat(PATH_FILE,FILENAME);
-	}
-//	printf("%s\n",PATH_FILE);//tmp
-	if(stat(PATH_FILE,&file)==0){
-		print_file_info(PATH_FILE,file,t,index);
-		index++;
-	}
-
 	if((count=scandir(PATH,&namelist,NULL,alphasort))==-1){
 		fprintf(stderr,"scandir error\n");
 		return index;
@@ -131,12 +106,13 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	for(int i=0;i<count;i++){
 		memset(lowpath,0,sizeof(lowpath));
 		if(!strcmp(namelist[i]->d_name,"..")) continue;	
+		if(!strcmp(namelist[i]->d_name,"X11")) continue;	
 		if(!strcmp(namelist[i]->d_name,".")) continue;
+		if(!strcmp(namelist[i]->d_name,"dev")) continue;
 		if(!strcmp(namelist[i]->d_name,"proc")) continue;
+		if(!strcmp(namelist[i]->d_name,"lib")) continue;
 		if(!strcmp(namelist[i]->d_name,"run")) continue;
 		if(!strcmp(namelist[i]->d_name,"snap")) continue;
-		if(!strcmp(namelist[i]->d_name,"sys")) continue;
-//		if(!strcmp(namelist[i]->d_name,"usr")) continue;
 		if(namelist[i]->d_name[0]=='.') continue;	
 		else {
 			str_length=strlen(PATH);
@@ -150,15 +126,24 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 			strcat(lowpath,namelist[i]->d_name);
 		}
 
-		
+		/*
 		if(stat(lowpath,&is_dir)==-1){
-//			fprintf(stderr,"%s\n",lowpath);
+			fprintf(stderr,"dir check error");
 		}
 		if((is_dir.st_mode&S_IFMT)!=S_IFDIR) continue;
-		
+		*/
 		if(((dir_ptr=opendir(lowpath))==NULL)) continue;
 		while((file_ptr=readdir(dir_ptr))==NULL){
 			fprintf(stderr,"readdir error\n");
+		}
+		memset(PATH_FILE,0,sizeof(PATH_FILE));
+		strcpy(PATH_FILE,lowpath);
+		strcat(PATH_FILE,"/");
+		strcat(PATH_FILE,FILENAME);
+		//printf("%s\n",lowpath);//temp
+		if(lstat(PATH_FILE,&file)==0){
+			print_file_info(FILENAME,lowpath,file,t,index);
+			index++;
 		}
 		closedir(dir_ptr);
 		index=find_dfs(FILENAME,lowpath,index);
@@ -168,16 +153,22 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	return index;
 }
 
-void print_file_info(char *PATH_FILE,struct stat file, struct tm *t,int index){
+void print_file_info(char *FILENAME,char *PATH,struct stat file, struct tm *t,int index){
 	char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
+	char PATH_FILE[PATH_SIZE];
+
+	strcpy(PATH_FILE,PATH);
+	strcat(PATH_FILE,"/");
+	strcat(PATH_FILE,FILENAME);
 
 	if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
 	printf("%-6d",index);
 	if(S_ISDIR(file.st_mode)){
-		printf("%-5ld",(long)file.st_size);
+		printf("%-5ld",dir_weight);
 	    printf("d");
 	}
 	else{
+		dir_weight+=(long)file.st_size;
 		printf("%-5ld",(long)file.st_size);
 		printf("-");
 	}
@@ -199,6 +190,31 @@ void print_file_info(char *PATH_FILE,struct stat file, struct tm *t,int index){
 
 }
 
+int target_file(char *FILENAME, char *PATH, int index){
+	struct stat file;
+	struct tm *t;
+	char PATH_FILE[PATH_SIZE];
+	DIR *dir_ptr=NULL;
+	struct dirent *file_ptr=NULL;
+
+	for(int i=0;i<file_index;i++) memset(Index_file[i],0,sizeof(Index_file[i]));
+	file_index=0;
+	if((dir_ptr=opendir(PATH))==NULL) {
+		fprintf(stderr,"opendir error");
+		return index;
+	}
+	while((file_ptr=readdir(dir_ptr))==NULL) fprintf(stderr,"readdir error");
+	strcpy(PATH_FILE,PATH);
+	strcat(PATH_FILE,"/");
+	strcat(PATH_FILE,FILENAME);
+	if(lstat(PATH_FILE,&file)==0){
+		print_file_info(FILENAME,PATH,file,t,index);
+		index++;
+	}
+	closedir(dir_ptr);
+	return index;
+}
+
 int find_index(int index_size){
 	char index[INPUT_SIZE];
 	char input[INPUT_SIZE];
@@ -214,10 +230,6 @@ int find_index(int index_size){
 		index[i]=input[i],i++;
 		if(input[i]==' '){
 			option=input[i+1];
-			if(input[i+2]!='\n') {
-				fprintf(stderr,"many option");
-				return 0;
-			}
 			break;
 		}
 	}
@@ -241,92 +253,6 @@ int find_index(int index_size){
 }
 
 void find_only_index(int index){
-	struct stat sb1;
-	struct stat sb2;
-
-	if(stat(Index_file[0],&sb1)==-1){
-		fprintf(stderr,"stat");
-	}
-	if(stat(Index_file[index],&sb2)==-1){
-		fprintf(stderr,"stat");
-	}
-
-	if((sb1.st_mode&S_IFMT)==S_IFREG&&(sb2.st_mode&S_IFMT)==S_IFREG)
-		file_diff(0,index);
-	if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR)
-		dir_diff(index);
-}
-
-void file_diff(int index1,int index2){
-	struct file_content f1;
-	struct file_content f2;
-	char buf[INPUT_SIZE];
-	char row1[INPUT_SIZE],row2[INPUT_SIZE];
-	int length1,length2;
-	int line1=1,line2=1;
-	bool last_line1=false,last_line2=false;
-	
-	file_to_buf(index1,&length1,buf);
-	strcpy(f1.buf,buf);
-	memset(buf,0,length1);
-
-	file_to_buf(index2,&length2,buf);
-	strcpy(f2.buf,buf);
-	
-	for(int i=0;i<length1;i++) if(f1.buf[i]==10) {
-		f1.buf[i]=0;	
-		line1++;
-	}
-	for(int i=0;i<length2;i++) 	if(f2.buf[i]==10) {
-		f2.buf[i]=0;
-		line2++;
-	}
-	if(f1.buf[length1]!=0) f1.buf[length1]=0,last_line1=true;
-	if(f2.buf[length2]!=0) f2.buf[length2]=0,last_line2=true;
-	line1=1,line2=1;
-	f1.line[1]=-1,f2.line[1]=-1;
-	for(int i=0;i<length1;i++) if(f1.buf[i]==0) f1.line[++line1]=i;
-	for(int i=0;i<length2;i++) if(f2.buf[i]==0) f2.line[++line2]=i;
-
-	row(f1,1,row1);
-	printf("%s\n",row1);
-	row(f1,2,row1);
-	printf("%s\n",row1);
-	row(f1,3,row1);
-	printf("%s\n",row1);
-	row(f1,4,row1);
-	printf("%s\n",row1);
-	row(f1,5,row1);
-	printf("%s\n",row1);
-	
-}
-
-void row(struct file_content f,int target_line,char *buf){
-	int i=0;
-	int j=f.line[target_line]+1;
-	memset(buf,0,INPUT_SIZE);
-	while(f.buf[j]!=0){
-		buf[i]=f.buf[j];
-		i++,j++;
-	}
-	buf[j]=0;
-}
-
-//char* file_to_buf(int index, int *length){
-void file_to_buf(int index, int *length,char *buf){
-//	char buf[INPUT_SIZE];
-	int fd;
-	if((fd=open(Index_file[index],O_RDONLY))<0){
-		fprintf(stderr,"file to buf open  error\n");
-	}
-	if((*length=read(fd,buf,INPUT_SIZE))<0){
-		fprintf(stderr,"file to buf read error\n");
-	}
-//	for(int i=0;i<*length;i++) if(buf[i]==10) buf[i]='\n';
-	buf[*length]=0;
-}
-
-void dir_diff(int index){
 }
 void find_option_q(int index){
 }
