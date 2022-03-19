@@ -34,7 +34,7 @@ int find_dfs(char *, char *, int);
 void print_file_info(char *,struct stat, struct tm *,int);
 int find_index();
 void find_only_index(int);
-void file_diff(int,int);
+void file_diff(int,int,int);
 void dir_diff(int,int);
 //char* file_to_buf(int,int*);
 void file_to_buf(int,int*,char *);
@@ -42,6 +42,7 @@ void row(struct file_content ,int,char *);
 void find_option_q(int);
 void find_option_s(int);
 void find_option_i(int);
+void file_to_buf_i(int,int*,char*);
 void find_option_r(int);
 void exit_command();
 void help_command();
@@ -217,8 +218,8 @@ int find_index(int index_size){
 		index[i]=input[i],i++;
 		if(input[i]==' '){
 			option=input[i+1];
-			if(input[i+2]!='\n') {
-				fprintf(stderr,"many option");
+			if(input[i+2]!='\0') {
+				fprintf(stderr,"many option\n");
 				return 0;
 			}
 			break;
@@ -264,14 +265,14 @@ void find_only_index(int index){
 	else if((sb2.st_mode&S_IFMT)==S_IFDIR) strcpy(buf2,"directory");
 
 	if((sb1.st_mode&S_IFMT)==S_IFREG&&(sb2.st_mode&S_IFMT)==S_IFREG)
-		file_diff(0,index);
+		file_diff(0,index,0);
 	else if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR)
 		dir_diff(0,index);
 	else
 		printf("File %s is a %s while file %s is a %s\n",Index_file[0],buf1,Index_file[index],buf2);
 }
 
-void file_diff(int index1,int index2){
+void file_diff(int index1,int index2,int option){
 	struct file_content f1;
 	struct file_content f2;
 	char buf[INPUT_SIZE];
@@ -282,11 +283,13 @@ void file_diff(int index1,int index2){
 	int o1=1,o2=1,n1=1,n2=1;
 	int same=1;
 	
-	file_to_buf(index1,&length1,buf);
+	if(option==1) file_to_buf_i(index1,&length1,buf);
+	else file_to_buf(index1,&length1,buf);
 	strcpy(f1.buf,buf);
 	memset(buf,0,length1);
 
-	file_to_buf(index2,&length2,buf);
+	if(option==1) file_to_buf_i(index2,&length2,buf);
+	else file_to_buf(index2,&length2,buf);
 	strcpy(f2.buf,buf);
 
 	if(length1!=length2) same=0;
@@ -338,7 +341,7 @@ void file_diff(int index1,int index2){
 		if(n2==line2&&o2<line1&&strcmp(bo2,bn2)){o2++;continue;}
 		if(o2==line1&&n2<line2){n2++;continue;}
 		if(n2!=line2&&bo2[0]==0&&bn2[0]==0) {o2++;continue;}//개행만 있는거 무시
-		//printf("%d %d %d  %d\n",o1,o2,n1,n2);
+		printf("%d %d %d  %d\n",o1,o2,n1,n2);
 		if(o2==1&&o2<n2&&n1!=n2){//top a
 			printf("0a1,%d\n",n2-1);
 			while(n1!=n2){
@@ -434,10 +437,10 @@ void row(struct file_content f,int target_line,char *buf){
 void file_to_buf(int index, int *length,char *buf){
 	int fd;
 	if((fd=open(Index_file[index],O_RDONLY))<0){
-		fprintf(stderr,"file to buf open  error\n");
+//		fprintf(stderr,"file to buf open  error\n");
 	}
 	if((*length=read(fd,buf,INPUT_SIZE))<0){
-		fprintf(stderr,"file to buf read error\n");
+//		fprintf(stderr,"file to buf read error\n");
 	}
 	buf[*length]=0;
 }
@@ -445,10 +448,77 @@ void file_to_buf(int index, int *length,char *buf){
 void dir_diff(int index1,int index2){
 }
 void find_option_q(int index){
+	char buf1[INPUT_SIZE];
+	char buf2[INPUT_SIZE];
+	char p1_file[PATH_SIZE];
+	char p2_file[PATH_SIZE];
+	int length1,length2;
+	int same=1;
+	int index1=0,index2;
+	int k=0;
+
+	while(Index_file[0][index1]==Index_file[index][index1]) index1++;
+	index2=index1;
+	while(Index_file[0][index1]!=0) p1_file[k++]=Index_file[0][index1++];
+	k=0;
+	while(Index_file[index][index2]!=0) p2_file[k++]=Index_file[index][index2++];
+
+	file_to_buf(0,&length1,buf1);
+	file_to_buf(index,&length2,buf2);
+
+	if(length1!=length2) same=0;
+	else for(int i=0;i<length1;i++) if(buf1[i]!=buf2[i]) same=0;
+	if(same) {
+		return;
+	}
+	else{
+		printf("Files %s and %s differ\n",p1_file,p2_file);
+		return;
+	}
 }
 void find_option_s(int index){
+	char buf1[INPUT_SIZE];
+	char buf2[INPUT_SIZE];
+	char p1_file[PATH_SIZE];
+	char p2_file[PATH_SIZE];
+	int length1,length2;
+	int same=1;
+	int index1=0,index2;
+	int k=0;
+
+
+	while(Index_file[0][index1]==Index_file[index][index1]) index1++;
+	index2=index1;
+	while(Index_file[0][index1]!=0) p1_file[k++]=Index_file[0][index1++];
+	k=0;
+	while(Index_file[index][index2]!=0) p2_file[k++]=Index_file[index][index2++];
+
+	file_to_buf(0,&length1,buf1);
+	file_to_buf(index,&length2,buf2);
+
+	if(length1!=length2) same=0;
+	else for(int i=0;i<length1;i++) if(buf1[i]!=buf2[i]) same=0;
+	if(same) {
+		printf("Files %s and %s are identical\n",p1_file,p2_file);
+		return;
+	}
+	else{
+		return;
+	}
 }
 void find_option_i(int index){
+	file_diff(0,index,1);
+}
+void file_to_buf_i(int index, int *length,char *buf){
+	int fd;
+	if((fd=open(Index_file[index],O_RDONLY))<0){
+//		fprintf(stderr,"file to buf open  error\n");
+	}
+	if((*length=read(fd,buf,INPUT_SIZE))<0){
+//		fprintf(stderr,"file to buf read error\n");
+	}
+	buf[*length]=0;
+	for(int i=0;i<*length;i++) if(buf[i]>='A'&&buf[i]<='Z') buf[i]+=32;
 }
 void find_option_r(int index){
 }
