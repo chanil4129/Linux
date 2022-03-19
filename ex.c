@@ -10,19 +10,17 @@
 
 #define TABLE_SIZE 1024
 #define BUFFER_SIZE 1024
+#define add(a,b) O1
 
-struct test{
-	int num;
-	char *buf1;
-	char buf2[1024];
-};
-	
 
 int main(void){
-	char buf[1023];
-	strcpy(buf,"12345");
-	printf("%d\n",strcmp(buf,"12345"));
-	buf[5]='\n';
-	printf("%d",strcmp(buf,"12345"));
+	int fd;
+	int length;
+	char buf[100];
+
+	if(fd=open("b",O_RDONLY));
+	if((length=read(fd,buf,10)>0));
+	printf("length: %d\n",length);
+	printf("%c\n",buf[0]);
 }
 	

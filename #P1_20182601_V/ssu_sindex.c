@@ -35,7 +35,7 @@ void print_file_info(char *,struct stat, struct tm *,int);
 int find_index();
 void find_only_index(int);
 void file_diff(int,int);
-void dir_diff(int);
+void dir_diff(int,int);
 //char* file_to_buf(int,int*);
 void file_to_buf(int,int*,char *);
 void row(struct file_content ,int,char *);
@@ -86,6 +86,9 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 	int index=0;
 	int realpath_length,path_length;
 
+	for(int i=0;i<file_index;i++)
+		memset(Index_file[i],0,PATH_SIZE);
+	file_index=0;
 	 if(realpath(PATH,REAL_PATH)==NULL){
 		fprintf(stderr,"(None)\n");	//modify=>exception
 		return;
@@ -228,6 +231,10 @@ int find_index(int index_size){
 		fprintf(stderr,"index size error\n");
 		return 0;
 	}
+	if(index_num==0){
+		fprintf(stderr,"another index num please..\n");
+		return 0;
+	}
 	if(option=='\0') find_only_index(index_num);
 	else if(option=='q') find_option_q(index_num);
 	else if(option=='s') find_option_s(index_num);
@@ -243,6 +250,7 @@ int find_index(int index_size){
 void find_only_index(int index){
 	struct stat sb1;
 	struct stat sb2;
+	char buf1[14],buf2[14];
 
 	if(stat(Index_file[0],&sb1)==-1){
 		fprintf(stderr,"stat");
@@ -250,21 +258,29 @@ void find_only_index(int index){
 	if(stat(Index_file[index],&sb2)==-1){
 		fprintf(stderr,"stat");
 	}
+	if((sb1.st_mode&S_IFMT)==S_IFREG) strcpy(buf1,"regular file");
+	else if((sb1.st_mode&S_IFMT)==S_IFDIR) strcpy(buf1,"directory");
+	if((sb2.st_mode&S_IFMT)==S_IFREG) strcpy(buf2,"regular file");
+	else if((sb2.st_mode&S_IFMT)==S_IFDIR) strcpy(buf2,"directory");
 
 	if((sb1.st_mode&S_IFMT)==S_IFREG&&(sb2.st_mode&S_IFMT)==S_IFREG)
 		file_diff(0,index);
-	if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR)
-		dir_diff(index);
+	else if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR)
+		dir_diff(0,index);
+	else
+		printf("File %s is a %s while file %s is a %s\n",Index_file[0],buf1,Index_file[index],buf2);
 }
 
 void file_diff(int index1,int index2){
 	struct file_content f1;
 	struct file_content f2;
 	char buf[INPUT_SIZE];
-	char row1[INPUT_SIZE],row2[INPUT_SIZE];
+	char bo1[INPUT_SIZE],bo2[INPUT_SIZE],bn1[INPUT_SIZE],bn2[INPUT_SIZE];
 	int length1,length2;
 	int line1=1,line2=1;
 	bool last_line1=false,last_line2=false;
+	int o1=1,o2=1,n1=1,n2=1;
+	int same=1;
 	
 	file_to_buf(index1,&length1,buf);
 	strcpy(f1.buf,buf);
@@ -272,7 +288,11 @@ void file_diff(int index1,int index2){
 
 	file_to_buf(index2,&length2,buf);
 	strcpy(f2.buf,buf);
-	
+
+	if(length1!=length2) same=0;
+	else for(int i=0;i<length1;i++) if(f1.buf[i]!=f2.buf[i]) same=0;
+	if(same) return;
+		
 	for(int i=0;i<length1;i++) if(f1.buf[i]==10) {
 		f1.buf[i]=0;	
 		line1++;
@@ -287,18 +307,117 @@ void file_diff(int index1,int index2){
 	f1.line[1]=-1,f2.line[1]=-1;
 	for(int i=0;i<length1;i++) if(f1.buf[i]==0) f1.line[++line1]=i;
 	for(int i=0;i<length2;i++) if(f2.buf[i]==0) f2.line[++line2]=i;
-
-	row(f1,1,row1);
-	printf("%s\n",row1);
-	row(f1,2,row1);
-	printf("%s\n",row1);
-	row(f1,3,row1);
-	printf("%s\n",row1);
-	row(f1,4,row1);
-	printf("%s\n",row1);
-	row(f1,5,row1);
-	printf("%s\n",row1);
+	line1--,line2--;
 	
+	if(line1==0&&f1.buf[0]==0){
+		printf("0a1,%d\n",line2);
+		for(int i=1;i<=line2;i++){
+			row(f2,i,bo1);
+			printf("> %s\n",bo1);
+		}	
+		return;
+	}
+	if(line2==0&&f2.buf[0]==0){
+		printf("1,%dd0\n",line1);
+		for(int i=1;i<=line1;i++){
+			row(f1,i,bo1);
+			printf("> %s\n",bo1);
+		}
+		return;
+	}
+
+	while(1){//
+		int i=1;
+		if(o1>=line1&&n1>=line2) break;
+		if(o2>line1) o2=o1,n2++;
+		row(f1,o1,bo1);
+		row(f1,o2,bo2);
+		row(f2,n1,bn1);
+		row(f2,n2,bn2);
+		if(n2!=line2&&strcmp(bo2,bn2)){o2++;continue;}//마지막 라인이 아니고, 다르면 o2++
+		if(n2==line2&&o2<line1&&strcmp(bo2,bn2)){o2++;continue;}
+		if(o2==line1&&n2<line2){n2++;continue;}
+		if(n2!=line2&&bo2[0]==0&&bn2[0]==0) {o2++;continue;}//개행만 있는거 무시
+		//printf("%d %d %d  %d\n",o1,o2,n1,n2);
+		if(o2==1&&o2<n2&&n1!=n2){//top a
+			printf("0a1,%d\n",n2-1);
+			while(n1!=n2){
+				printf("> %s\n",bn1);
+				row(f2,++n1,bn1);
+			}
+			if(n2==line2) if(!last_line2) printf("\\ No newline at end of file\n");
+			continue;
+		}
+		if(n2==1&&o2>n2&&o1!=o2){//top d
+			printf("1,%dd0\n",o2-1);
+			while(o1!=o2){
+				printf("< %s\n",bo1);
+				row(f1,++o1,bo1);
+			}
+			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
+			continue;
+		}
+		if(o1!=line1&&n1!=line2&&o1==o2&&n1==n2) {o1++,n1++,o2++,n2++;continue;}//같은 문장
+		while(1){//개행 같은거 처리
+			row(f1,o2-i,bo2),row(f2,n2-i,bn2);
+			if(bo2[0]!=0||bn2[0]!=0) break;
+			i++;
+		}
+		if(o2==line1&&n2==line2)i--;
+
+		if((n1+i)==n2&&(o1+i)<o2){//(o1),(o2)c(n1)
+			printf("%d,%dc%d\n",o1,o2-i,n1);
+			while(o1<=(o2-i)){
+				printf("< %s\n",bo1); row(f1,++o1,bo1);
+			}
+			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
+			printf("---\n");
+			printf("> %s\n",bn1);
+			if(n2==line2) if(!last_line2) printf("\\ No newline at end of file\n");
+			o1=o2,n1=n2;
+			continue;
+		}
+		if((n1+i)==n2&&(o1+i)==o2){//(o1)c(n1)
+			printf("%dc%d\n",o1,n1);
+			printf("< %s\n",bo1);
+			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
+			printf("---\n");
+			printf("> %s\n",bn1);
+			if(n2==line2) if(!last_line2) printf("\\ No newline at end of file\n");
+			o1=o2,n1=n2;
+			continue;
+		}
+		if((n1+i)<n2&&(o1+i)==o2){//(o1)c(n1),(n2)
+			printf("%dc%d,%d\n",o1,n1,n2-i);
+			printf("< %s\n",bo1);
+			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
+			printf("---\n");
+			while(n1<=(n2-i)){
+				printf(">%s\n",bn1);
+				row(f2,++n1,bn1);
+			}
+			if(n2==line2) if(!last_line2) printf("\\ No newline at end of file\n");
+			o1=o2,n1=n2;
+			continue;
+		}
+		if((n1+i)<n2&&(o1+i)<o2){//(o1),(o2)c(n1),(n2)
+			printf("%d,%dc%d,%d\n",o1,o2,n1,n2);
+			while(o1<=(o2-i)){
+				printf("< %s\n",bo1);
+				row(f1,++o1,bo1);
+			}
+			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
+			printf("---\n");
+			while(n1<=(n2-i)){
+				printf(">%s\n",bn1);
+				row(f2,++n1,bn1);
+			}
+			if(n2==line2) if(!last_line2) printf("\\ No newline at end of file\n");
+			o1=o2,n1=n2;
+			continue;
+		}
+
+	}
 }
 
 void row(struct file_content f,int target_line,char *buf){
@@ -312,9 +431,7 @@ void row(struct file_content f,int target_line,char *buf){
 	buf[j]=0;
 }
 
-//char* file_to_buf(int index, int *length){
 void file_to_buf(int index, int *length,char *buf){
-//	char buf[INPUT_SIZE];
 	int fd;
 	if((fd=open(Index_file[index],O_RDONLY))<0){
 		fprintf(stderr,"file to buf open  error\n");
@@ -322,11 +439,10 @@ void file_to_buf(int index, int *length,char *buf){
 	if((*length=read(fd,buf,INPUT_SIZE))<0){
 		fprintf(stderr,"file to buf read error\n");
 	}
-//	for(int i=0;i<*length;i++) if(buf[i]==10) buf[i]='\n';
 	buf[*length]=0;
 }
 
-void dir_diff(int index){
+void dir_diff(int index1,int index2){
 }
 void find_option_q(int index){
 }
@@ -355,6 +471,10 @@ void exit_command(void){	//exit command
     gettimeofday(&end_time,NULL); //timer end
     Runtime_sec=end_time.tv_sec-start_time.tv_sec;
     Runtime_usec=end_time.tv_usec-start_time.tv_usec;
+	if(Runtime_usec<0){
+		Runtime_sec-=1.0;
+		Runtime_usec+=1000000.0;
+	}
     printf("Prompt End\nRuntime: %d:%d(sec:usec)\n",(int)Runtime_sec,(int)Runtime_usec);
     exit(0);
 }
