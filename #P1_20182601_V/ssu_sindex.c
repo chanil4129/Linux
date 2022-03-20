@@ -33,17 +33,23 @@ void division_FILENAME_PATH(char *, char *, char *);
 int find_dfs(char *, char *, int);
 void print_file_info(char *,struct stat, struct tm *,int);
 int find_index();
+int dir_weight_dfs(char *, char *, int );
 void find_only_index(int);
 void file_diff(int,int,int);
 void dir_diff(int,int);
+void file_name_extract(char*,char*,int);
 //char* file_to_buf(int,int*);
 void file_to_buf(int,int*,char *);
 void row(struct file_content ,int,char *);
-void find_option_q(int);
-void find_option_s(int);
-void find_option_i(int);
+void find_option_q_file(int);
+void find_option_q_dir(int);
+void find_option_s_file(int);
+void find_option_s_dir(int);
+void find_option_i_file(int);
+void find_option_i_dir(int);
 void file_to_buf_i(int,int*,char*);
-void find_option_r(int);
+void find_option_r_file(int);
+void find_option_r_dir(int);
 void exit_command();
 void help_command();
 
@@ -96,10 +102,98 @@ void find_command(char *FILENAME, char *PATH){   //scandir(디렉토리 목록 �
 	}
 	dir_weight=0;
 	index=find_dfs(FILENAME, REAL_PATH, index);
-	if(index==1) printf("(None)\n");
+	if(index==0) printf("not file\n");
+	else if(index==1) printf("(None)\n");
 	else while(!find_index(index));
 	return;
 }
+
+int dir_weight_dfs(char *FILENAME, char *PATH, int index){
+	struct stat file;
+	struct stat d_file;
+	struct stat is_dir;
+	struct stat is_reg;
+	DIR *dir_ptr=NULL;
+	struct dirent *file_ptr=NULL;
+	struct dirent **namelist;
+	char lowpath[PATH_SIZE];
+	char PATH_FILE[PATH_SIZE];
+	int count, str_length;
+	char buf[INPUT_SIZE];
+	int length;
+	int k=0,t=0;
+
+	
+	length=strlen(PATH)-1;
+	while(PATH[length--]!='/') k++;
+	length++;
+	for(int i=0;i<k;i++) buf[i]=PATH[++length];
+	buf[k]=0;
+	if(!strcmp(FILENAME,buf)){
+	   	dir_weight=0;
+		printf("%s\n",buf);
+	}
+
+
+	/*
+	if(!strcmp(PATH,"/")){
+	   	strcpy(PATH_FILE,"/");
+		strcat(PATH_FILE,FILENAME);
+	}
+	else{
+		strcpy(PATH_FILE,PATH);
+		strcat(PATH_FILE,"/");
+		strcat(PATH_FILE,FILENAME);
+	}
+	*/
+	if((count=scandir(PATH,&namelist,NULL,alphasort))==-1){
+		fprintf(stderr,"scandir error\n");
+		return index;
+	}
+	for(int i=0;i<count;i++){
+		memset(lowpath,0,sizeof(lowpath));
+        if(!strcmp(namelist[i]->d_name,"..")) continue;
+        if(!strcmp(namelist[i]->d_name,".")) continue;
+        if(!strcmp(namelist[i]->d_name,"proc")) continue;
+        if(!strcmp(namelist[i]->d_name,"run")) continue;
+        if(!strcmp(namelist[i]->d_name,"snap")) continue;
+        if(!strcmp(namelist[i]->d_name,"sys")) continue;
+//      if(!strcmp(namelist[i]->d_name,"usr")) continue;
+        if(namelist[i]->d_name[0]=='.') continue;
+        else {
+            str_length=strlen(PATH);
+             if(PATH[str_length-1]=='/') {
+                 strcpy(lowpath,PATH);
+             }
+             else {
+                 strcpy(lowpath,PATH);
+                 strcat(lowpath,"/");
+             }
+             strcat(lowpath,namelist[i]->d_name);
+        }
+
+		if(stat(lowpath,&is_reg)==-2){
+                 fprintf(stderr,"%s\n",lowpath);
+         }
+//		printf("%s : %ld\n",lowpath,dir_weight);//tmp
+
+		if((is_reg.st_mode&S_IFMT)==S_IFREG) dir_weight+=(long)is_reg.st_size;
+
+        if(((dir_ptr=opendir(lowpath))==NULL)) continue;
+		while((file_ptr=readdir(dir_ptr))==NULL){
+             fprintf(stderr,"readdir error\n");
+         }
+         closedir(dir_ptr);
+		index=dir_weight_dfs(FILENAME, lowpath,index);
+		if(!strcmp(namelist[i]->d_name,FILENAME)) break;
+     }
+     for(int i=0;i<count;i++) free(namelist[i]);
+     free(namelist);
+     return index;
+}
+
+
+	
 
 int find_dfs(char *FILENAME, char *PATH, int index){
 	struct stat file;
@@ -124,6 +218,8 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 	}
 //	printf("%s\n",PATH_FILE);//tmp
 	if(stat(PATH_FILE,&file)==0){
+	   	dir_weight=0;
+		dir_weight_dfs(FILENAME,PATH,index);
 		print_file_info(PATH_FILE,file,t,index);
 		index++;
 	}
@@ -159,6 +255,13 @@ int find_dfs(char *FILENAME, char *PATH, int index){
 //			fprintf(stderr,"%s\n",lowpath);
 		}
 		if((is_dir.st_mode&S_IFMT)!=S_IFDIR) continue;
+
+		/*
+		if(stat(lowpath,&is_reg)==-1){
+//                 fprintf(stderr,"%s\n",lowpath);
+         }
+         if((is_reg.st_mode&S_IFMT)!=S_IFREG) dir_weight[index]+=(long)is_reg.s    t_size;
+		*/
 		
 		if(((dir_ptr=opendir(lowpath))==NULL)) continue;
 		while((file_ptr=readdir(dir_ptr))==NULL){
@@ -178,7 +281,7 @@ void print_file_info(char *PATH_FILE,struct stat file, struct tm *t,int index){
 	if(!index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
 	printf("%-6d",index);
 	if(S_ISDIR(file.st_mode)){
-		printf("%-5ld",(long)file.st_size);
+		printf("%-5ld",dir_weight);
 	    printf("d");
 	}
 	else{
@@ -204,8 +307,11 @@ void print_file_info(char *PATH_FILE,struct stat file, struct tm *t,int index){
 }
 
 int find_index(int index_size){
+	struct stat sb1;
+	struct stat sb2;
 	char index[INPUT_SIZE];
 	char input[INPUT_SIZE];
+	char buf1[14],buf2[14];
 	char option='\0';
 	int index_num;
 	char c;
@@ -236,27 +342,11 @@ int find_index(int index_size){
 		fprintf(stderr,"another index num please..\n");
 		return 0;
 	}
-	if(option=='\0') find_only_index(index_num);
-	else if(option=='q') find_option_q(index_num);
-	else if(option=='s') find_option_s(index_num);
-	else if(option=='i') find_option_i(index_num);
-	else if(option=='r') find_option_r(index_num);
-	else {
-	fprintf(stderr,"your type option is non_option\n");
-	return 0;
-	}
-	return 1;
-}
-
-void find_only_index(int index){
-	struct stat sb1;
-	struct stat sb2;
-	char buf1[14],buf2[14];
 
 	if(stat(Index_file[0],&sb1)==-1){
 		fprintf(stderr,"stat");
 	}
-	if(stat(Index_file[index],&sb2)==-1){
+	if(stat(Index_file[index_num],&sb2)==-1){
 		fprintf(stderr,"stat");
 	}
 	if((sb1.st_mode&S_IFMT)==S_IFREG) strcpy(buf1,"regular file");
@@ -264,12 +354,32 @@ void find_only_index(int index){
 	if((sb2.st_mode&S_IFMT)==S_IFREG) strcpy(buf2,"regular file");
 	else if((sb2.st_mode&S_IFMT)==S_IFDIR) strcpy(buf2,"directory");
 
-	if((sb1.st_mode&S_IFMT)==S_IFREG&&(sb2.st_mode&S_IFMT)==S_IFREG)
-		file_diff(0,index,0);
-	else if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR)
-		dir_diff(0,index);
+	if((sb1.st_mode&S_IFMT)==S_IFREG&&(sb2.st_mode&S_IFMT)==S_IFREG){
+		if(option=='\0') file_diff(0,index_num,0);
+		else if(option=='q') find_option_q_file(index_num);
+		else if(option=='s') find_option_s_file(index_num);
+		else if(option=='i') find_option_i_file(index_num);
+		else if(option=='r') find_option_r_file(index_num);
+		else {
+			fprintf(stderr,"your type option is non_option\n");
+			return 0;
+		}
+		return 1;
+	}
+	else if((sb1.st_mode&S_IFMT)==S_IFDIR&&(sb2.st_mode&S_IFMT)==S_IFDIR){
+		if(option=='\0') dir_diff(0,index_num);
+		else if(option=='q') find_option_q_dir(index_num);
+		else if(option=='s') find_option_s_dir(index_num);
+		else if(option=='i') find_option_i_dir(index_num);
+		else if(option=='r') find_option_r_dir(index_num);
+		else {
+			fprintf(stderr,"your type option is non_option\n");
+			return 0;
+		}
+		return 1;
+	}
 	else
-		printf("File %s is a %s while file %s is a %s\n",Index_file[0],buf1,Index_file[index],buf2);
+		printf("File %s is a %s while file %s is a %s\n",Index_file[0],buf1,Index_file[index_num],buf2);
 }
 
 void file_diff(int index1,int index2,int option){
@@ -331,17 +441,23 @@ void file_diff(int index1,int index2,int option){
 
 	while(1){//
 		int i=1;
+		row(f1,o1,bo1);
+		row(f2,n1,bn1);
+		if(o1==line1&&n1==line2&&strcmp(bo1,bn1)){
+			printf("%dc%d\n",o1,n2);
+			printf("< %s\n",bo1);
+			printf("---\n");
+			printf("> %s\n",bn2);
+		}
 		if(o1>=line1&&n1>=line2) break;
 		if(o2>line1) o2=o1,n2++;
-		row(f1,o1,bo1);
 		row(f1,o2,bo2);
-		row(f2,n1,bn1);
 		row(f2,n2,bn2);
 		if(n2!=line2&&strcmp(bo2,bn2)){o2++;continue;}//마지막 라인이 아니고, 다르면 o2++
 		if(n2==line2&&o2<line1&&strcmp(bo2,bn2)){o2++;continue;}
 		if(o2==line1&&n2<line2){n2++;continue;}
 		if(n2!=line2&&bo2[0]==0&&bn2[0]==0) {o2++;continue;}//개행만 있는거 무시
-		printf("%d %d %d  %d\n",o1,o2,n1,n2);
+		//printf("%d %d %d  %d\n",o1,o2,n1,n2);
 		if(o2==1&&o2<n2&&n1!=n2){//top a
 			printf("0a1,%d\n",n2-1);
 			while(n1!=n2){
@@ -360,6 +476,7 @@ void file_diff(int index1,int index2,int option){
 			if(o2==line1) if(!last_line1) printf("\\ No newline at end of file\n");
 			continue;
 		}
+		if(o1!=line1&&n1!=line2&&o1==o2&&n1==n2) {o1++,n1++,o2++,n2++;continue;}//같은 문장
 		if(o1!=line1&&n1!=line2&&o1==o2&&n1==n2) {o1++,n1++,o2++,n2++;continue;}//같은 문장
 		while(1){//개행 같은거 처리
 			row(f1,o2-i,bo2),row(f2,n2-i,bn2);
@@ -437,31 +554,40 @@ void row(struct file_content f,int target_line,char *buf){
 void file_to_buf(int index, int *length,char *buf){
 	int fd;
 	if((fd=open(Index_file[index],O_RDONLY))<0){
-//		fprintf(stderr,"file to buf open  error\n");
+		//		fprintf(stderr,"file to buf open  error\n");
 	}
 	if((*length=read(fd,buf,INPUT_SIZE))<0){
-//		fprintf(stderr,"file to buf read error\n");
+		//		fprintf(stderr,"file to buf read error\n");
 	}
 	buf[*length]=0;
 }
 
 void dir_diff(int index1,int index2){
 }
-void find_option_q(int index){
+
+void file_name_extract(char *file_1,char *file_2, int index){
+	int i=0;
+	int j=0;
+	int k=0;
+
+	memset(file_1,0,INPUT_SIZE);
+	memset(file_2,0,INPUT_SIZE);
+	while(Index_file[0][i]==Index_file[index][i]) i++;
+	j=i;
+	while(Index_file[0][i]!=0) file_1[k++]=Index_file[0][i++];
+	k=0;
+	while(Index_file[index][j]!=0) file_2[k++]=Index_file[index][j++];
+}
+
+void find_option_q_file(int index){
 	char buf1[INPUT_SIZE];
 	char buf2[INPUT_SIZE];
 	char p1_file[PATH_SIZE];
 	char p2_file[PATH_SIZE];
 	int length1,length2;
 	int same=1;
-	int index1=0,index2;
-	int k=0;
 
-	while(Index_file[0][index1]==Index_file[index][index1]) index1++;
-	index2=index1;
-	while(Index_file[0][index1]!=0) p1_file[k++]=Index_file[0][index1++];
-	k=0;
-	while(Index_file[index][index2]!=0) p2_file[k++]=Index_file[index][index2++];
+	file_name_extract(p1_file,p2_file,index);
 
 	file_to_buf(0,&length1,buf1);
 	file_to_buf(index,&length2,buf2);
@@ -475,23 +601,18 @@ void find_option_q(int index){
 		printf("Files %s and %s differ\n",p1_file,p2_file);
 		return;
 	}
+
+
 }
-void find_option_s(int index){
+void find_option_s_file(int index){
 	char buf1[INPUT_SIZE];
 	char buf2[INPUT_SIZE];
 	char p1_file[PATH_SIZE];
 	char p2_file[PATH_SIZE];
 	int length1,length2;
 	int same=1;
-	int index1=0,index2;
-	int k=0;
 
-
-	while(Index_file[0][index1]==Index_file[index][index1]) index1++;
-	index2=index1;
-	while(Index_file[0][index1]!=0) p1_file[k++]=Index_file[0][index1++];
-	k=0;
-	while(Index_file[index][index2]!=0) p2_file[k++]=Index_file[index][index2++];
+	file_name_extract(p1_file,p2_file,index);
 
 	file_to_buf(0,&length1,buf1);
 	file_to_buf(index,&length2,buf2);
@@ -505,23 +626,29 @@ void find_option_s(int index){
 	else{
 		return;
 	}
+
 }
-void find_option_i(int index){
+void find_option_i_file(int index){
 	file_diff(0,index,1);
 }
 void file_to_buf_i(int index, int *length,char *buf){
 	int fd;
 	if((fd=open(Index_file[index],O_RDONLY))<0){
-//		fprintf(stderr,"file to buf open  error\n");
+		//      fprintf(stderr,"file to buf open  error\n");
 	}
 	if((*length=read(fd,buf,INPUT_SIZE))<0){
-//		fprintf(stderr,"file to buf read error\n");
+		//      fprintf(stderr,"file to buf read error\n");
 	}
 	buf[*length]=0;
 	for(int i=0;i<*length;i++) if(buf[i]>='A'&&buf[i]<='Z') buf[i]+=32;
+
 }
-void find_option_r(int index){
+void find_option_r_file(int index){
 }
+void find_option_q_dir(int index){}
+void find_option_s_dir(int index){}
+void find_option_i_dir(int index){}
+void find_option_r_dir(int index){}
 
 int command_classify(char *result){	//classify command
 	int c;
@@ -534,7 +661,6 @@ int command_classify(char *result){	//classify command
 	else if(result[0]=='e'&&result[1]=='x'&&result[2]=='i'&&result[3]=='t'&&result[4]=='\0') return EXIT;
 	else return HELP;
 }
-
 
 void exit_command(void){	//exit command
     double Runtime_sec,Runtime_usec;

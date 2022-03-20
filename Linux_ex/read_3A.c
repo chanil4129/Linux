@@ -15,6 +15,5 @@ int main(void){
 		if(read(fd,&c,1)>0) putchar(c);
 		else break;
 	}
-	close(fd);
 	exit(0);
 }

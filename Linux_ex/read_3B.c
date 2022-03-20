@@ -14,7 +14,10 @@ int main(void){
 	}
 
 	while(1){
-		if(read(fd,&character,1)) if(character=='\n') line_count++;
+		if(read(fd,&character,1)>0) {
+			if(character=='\n') 
+				line_count++;
+		}
 		else break;
 	}
 
