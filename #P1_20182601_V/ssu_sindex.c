@@ -38,6 +38,7 @@ struct s_diff_dir{
 	char path[PATH_SIZE];
 	char file_path[PATH_SIZE];
 	char mode[20];
+	int lowpath;
 } s_dir[2][TEMP];
 int file_num;//파일 개수
 int file_index;//파일 번호
@@ -53,15 +54,15 @@ void find_option_r_file(int,int);
 void find_option_q_dir(int);
 void find_option_s_dir(int);
 void find_option_i_dir(int);
-void find_option_r_dir(int);
 void file_diff(int,int,int);
-void dir_diff(int,int);
-int dir_diff_cal(int ,int );
+void dir_diff(int,int,int);
+int dir_diff_cal(int ,int,char *,int,int );
 void row(struct file_content,int,char*);
 void file_to_buf(int,int *,char *);
 void file_to_buf_dir(int,int,int*,char*);
 void file_to_buf_i(int,int *,char *);
 void file_name_extract(char *,char *,int,int);
+void dir_name_extract(char *,char *,int ,int );
 
 void division_FILENAME_PATH(char *user_input){//파일 이름과 경로 구분
 	int i=5,j=0; //i:"find" except
@@ -292,7 +293,7 @@ int find_choose(){
         else if(option=='q') find_option_q_file(0,index_num);
         else if(option=='s') find_option_s_file(0,index_num);
         else if(option=='i') find_option_i_file(0,index_num);
-        else if(option=='r') find_option_r_file(0,index_num);
+        else if(option=='r') file_diff(0,index_num,0);
         else {
             fprintf(stderr,"your type option is non_option\n");
             return 0;
@@ -300,11 +301,11 @@ int find_choose(){
         return 1;
     }
 	else if(!strcmp(s_store[0].mode,"directory")&&!strcmp(s_store[index_num].mode,"directory")){
-		if(option=='\0') dir_diff(0,index_num);
+		if(option=='\0') dir_diff(0,index_num,0);
         else if(option=='q') find_option_q_dir(index_num);
         else if(option=='s') find_option_s_dir(index_num);
         else if(option=='i') find_option_i_dir(index_num);
-        else if(option=='r') find_option_r_dir(index_num);
+        else if(option=='r') dir_diff(0,index_num,1);
         else {
             fprintf(stderr,"your type option is non_option\n");
             return 0;
@@ -316,7 +317,7 @@ int find_choose(){
 }
 	
 void file_diff(int index1,int index2,int option){
-	/*
+	
     struct file_content f1;
     struct file_content f2;
     char buf[TEMP];
@@ -480,7 +481,6 @@ void file_diff(int index1,int index2,int option){
         }
 
     }
-*/
 }
 void row(struct file_content f,int target_line,char *buf){
     int i=0;
@@ -504,7 +504,7 @@ void file_to_buf(int index, int *length,char *buf){
     buf[*length]=0;
 }
 void file_to_buf_dir(int N,int index,int *length,char *buf){
-	printf("file_to_buf_dir");
+//	printf("file_to_buf_dir");
 	int fd;
 	if((fd=open(s_dir[N][index].file_path,O_RDONLY))<0){
         //      fprintf(stderr,"file to buf open  error\n");
@@ -528,28 +528,41 @@ void file_to_buf_i(int index, int *length,char *buf){
 
 }
 
-void dir_diff(int index1,int index2){
-	int length_1;
-	int length_2;
+void dir_diff(int index1,int index2,int option){
+	struct stat file_1,file_2;
+	int length_1=0;
+	int length_2=0;
 	char p1_path[TEMP];
 	char p2_path[TEMP];
 
-	dir_name_extract(p1_file,p2_file,index1,index2);
-	length_1=dir_diff_cal(0,index1);
-	length_2=dir_diff_cal(1,index2);
+	for(int i=0;i<TEMP;i++){
+		memset(&s_dir[0][i],0,sizeof(struct s_diff_dir));
+		memset(&s_dir[1][i],0,sizeof(struct s_diff_dir));
+	}
+	length_1=dir_diff_cal(0,index1,s_store[index1].file_path,option,length_1);
+	length_2=dir_diff_cal(1,index2,s_store[index2].file_path,option,length_2);
+//	dir_name_extract(p1_path,p2_path,index1,index2);
 
 	for(int i=0;i<length_1;i++){
 		for(int j=0;j<length_2;j++){
-			if(!strcmp(s_dir[0][i].filename,s_dir[1][j].filename)){
-				if(!strcmp(s_dir[0][i].mode,s_dir[1][j].mode)){
-					if(!strcmp(s_dir[0][i].mode,"regular file")){
+			dir_name_extract(p1_path,p2_path,i,j);
+			if(!strcmp(s_dir[0][i].filename,s_dir[1][j].filename)){//파일 이름 같으면
+				if(!strcmp(s_dir[0][i].mode,s_dir[1][j].mode)){//모드가 같을 때
+					if(!strcmp(s_dir[0][i].mode,"regular file")){//둘다 정규 파일이면
+						if(option==1)
+							printf("diff -r %s/%s %s/%s\n",p1_path,s_dir[0][i].filename,p2_path,s_dir[1][j].filename);
+						else
+							printf("diff %s/%s %s/%s\n",p1_path,s_dir[0][i].filename,p2_path,s_dir[1][j].filename);
 						file_diff(i,j,2);break;
 					}
-					else{
-						printf("Common subdirectories: %s%s and %s%s\n",p1_path,s_dir[0][i].filename,p2_path,s_dir[1][j].filename);break;
+					else{//둘다 디렉토리이면
+						if(option==1&&s_dir[0][i].lowpath&&s_dir[1][j].lowpath){//r모드일때 하위 디렉토리가 없어야 출력
+							break;
+						}
+						printf("Common subdirectories: %s/%s and %s/%s\n",p1_path,s_dir[0][i].filename,p2_path,s_dir[1][j].filename);break;
 					}
-				}
-				printf("File %s%s is a %s while file %s%s is a %s\n",p1_path,s_dir[0][i].filename,s_dir[0][i].mode,p2_path,s_dir[1][j].filename,s_dir[1][j].mode);break;
+				}//파일 종류가 다르면
+				printf("File %s/%s is a %s while file %s/%s is a %s\n",p1_path,s_dir[0][i].filename,s_dir[0][i].mode,p2_path,s_dir[1][j].filename,s_dir[1][j].mode);break;
 			}
 			if(j==length_2-1){
 				printf("Only in %s: %s\n",p1_path,s_dir[0][i].filename);
@@ -558,27 +571,25 @@ void dir_diff(int index1,int index2){
 	}
 	for(int j=0;j<length_2;j++){
 		for(int i=0;i<length_1;i++){
+			dir_name_extract(p1_path,p2_path,i,j);
 			if(!strcmp(s_dir[0][i].filename,s_dir[1][j].filename))
 				break;
 			if(i==length_1-1){
-				printf("Only in %s: %s",p2_path,s_dir[1][j].filename);
+				printf("Only in %s: %s\n",p2_path,s_dir[1][j].filename);
 			}
 		}
 	}
 
 }
 
-int dir_diff_cal(int N,int index){
+int dir_diff_cal(int N,int index,char *path,int option,int length){
 	struct stat file;
 	struct dirent **namelist;
 	char lowpath[TEMP];
-	int length=0;
 	int count;
 
-	for(int i=0;i<TEMP;i++){
-		memset(&s_dir[N][i],0,sizeof(struct s_diff_dir));
-	}
-	if((count=scandir(s_store[index].file_path,&namelist,NULL,alphasort))<0){
+	s_dir[N][length].lowpath=0;//하위 디렉토리가 있는지 검사하는것. 일단 초기화
+	if((count=scandir(path,&namelist,NULL,alphasort))<0){
 //		fprintf(stderr,"scandir error\n");
 		return length;
 	}
@@ -586,20 +597,26 @@ int dir_diff_cal(int N,int index){
 		memset(lowpath,0,sizeof(lowpath));
 		if(namelist[i]->d_name[0]=='.') continue;
 
-		strcpy(lowpath,s_store[index].file_path);
+		strcpy(lowpath,path);
 		strcat(lowpath,"/");
 		strcat(lowpath,namelist[i]->d_name);
+		//printf("lowpath : %s\n",lowpath);//tmp
 		if(stat(lowpath,&file)==0){
 			if((file.st_mode&S_IFMT)==S_IFDIR||(file.st_mode&S_IFMT)==S_IFREG){
+				s_dir[N][length].lowpath++;
 				strcpy(s_dir[N][length].filename,namelist[i]->d_name);
 				strcpy(s_dir[N][length].path,s_store[index].file_path);
 				strcpy(s_dir[N][length].file_path,lowpath);
+			//	printf("lowpath : %s\n",lowpath);//tmp
 				if((file.st_mode&S_IFMT)==S_IFDIR)
 					strcpy(s_dir[N][length].mode,"directory");
 				else
 					strcpy(s_dir[N][length].mode,"regular file");
 				length++;
 			}
+		}
+		if(option==1){
+			length=dir_diff_cal(N,index,lowpath,option,length);
 		}
 	}
 	for(int i=0;i<count;i++) free(namelist[i]);
@@ -661,9 +678,6 @@ void find_option_s_file(int index1,int index2){
 void find_option_i_file(int index1,int index2){
 	 file_diff(index1,index2,1);
 }
-void find_option_r_file(int index1,int index2){
-	printf("rf\n");
-}
 void find_option_q_dir(int index){
 	printf("qd\n");
 }
@@ -691,12 +705,18 @@ void file_name_extract(char *file_1,char *file_2,int index1,int index2){
 }
 void dir_name_extract(char *file_1,char *file_2,int index1,int index2){
 	int i=0,j=0,k=0;
-	memset(file_1,0,TEMP);memset(file_2,0,TEMP);memset(path_1,0,TEMP);memset(path_2,0,TEMP);
+	memset(file_1,0,TEMP);memset(file_2,0,TEMP);
+	//printf("extract : %s\nextract : %s\n",s_dir[0][index1].file_path,s_dir[1][index2].file_path);//temp
 	while(s_dir[0][index1].file_path[i]==s_dir[1][index2].file_path[i])i++;
 	while(s_dir[0][index1].file_path[i]!='/')i--;
 	i++;j=i;
-	while(s_dir[
-
+	while(s_dir[0][index1].file_path[i]!=0) file_1[k++]=s_dir[0][index1].file_path[i++];
+	while(s_dir[0][index1].file_path[i]!='/')file_1[--k]=0,i--;
+	k=0;
+	//printf("extract : %s\n",file_1);//temp
+	while(s_dir[1][index2].file_path[j]!=0) file_2[k++]=s_dir[1][index2].file_path[j++];
+	while(s_dir[1][index2].file_path[j]!='/')file_2[--k]=0,j--;
+	
 }
 
 int command_classify(char *result){ //classify command
