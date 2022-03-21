@@ -56,7 +56,6 @@ void find_option_s_dir(int);
 void find_option_i_dir(int);
 void file_diff(int,int,int);
 void dir_diff(int,int,int);
-int dir_file_same(int,int);
 int dir_diff_cal(int ,int,char *,int,int );
 void row(struct file_content,int,char*);
 void file_to_buf(int,int *,char *);
@@ -569,7 +568,6 @@ void dir_diff(int index1,int index2,int option){
 			if(!strcmp(s_dir[0][i].filename,s_dir[1][j].filename)){//파일 이름 같으면
 				if(!strcmp(s_dir[0][i].mode,s_dir[1][j].mode)){//모드가 같을 때
 					if(!strcmp(s_dir[0][i].mode,"regular file")){//둘다 정규 파일이면
-						if(dir_file_same(i,j)) break;
 						if(option==1)
 							printf("diff -r %s/%s %s/%s\n",p1_path,s_dir[0][i].filename,p2_path,s_dir[1][j].filename);
 						else
@@ -602,23 +600,6 @@ void dir_diff(int index1,int index2,int option){
 	}
 
 }
-
-int dir_file_same(int index1,int index2){
-	char buf1[TEMP];
-	char buf2[TEMP];
-	char p1_file[PATH_SIZE];
-	char p2_file[PATH_SIZE];
-    int length1,length2;
-    int same=1;
-
-    file_to_buf_dir(0,index1,&length1,buf1);
-    file_to_buf_dir(1,index2,&length2,buf2);
-
-    if(length1!=length2) same=0;
-    else for(int i=0;i<length1;i++) if(buf1[i]!=buf2[i]) same=0;
-	return same;
-}
-
 
 int dir_diff_cal(int N,int index,char *path,int option,int length){
 	struct stat file;
