@@ -28,6 +28,7 @@ struct s_store_file{
 	char path[PATH_SIZE];
 	char file_path[PATH_SIZE];
 	char mode[20];
+	int size;
 } s_store[TEMP];
 struct file_content {
     int line[TEMP];
@@ -40,31 +41,61 @@ struct s_diff_dir{
 	char mode[20];
 	int lowpath;
 } s_dir[2][TEMP];
+
 int file_num;//파일 개수
 int file_index;//파일 번호
 
 void find_dfs(char *);
-int find_choose();
-int dir_weight_dfs(char *,int);//수정 필요
+int find_choose(void);
+int dir_weight_dfs(char*,int);
 void print_file_info(struct stat ,int);
 void find_option_q_file(int,int);
 void find_option_s_file(int,int);
-void find_option_i_file(int,int);
-void find_option_r_file(int,int);
 void find_option_q_dir(int);
 void find_option_s_dir(int);
-void find_option_i_dir(int);
 void file_diff(int,int,int);
 void dir_diff(int,int,int);
 int dir_file_same(int,int);
-int dir_diff_cal(int ,int,char *,int,int );
+int dir_diff_cal(int,int,char *,int,int);
 void row(struct file_content,int,char*);
-void file_to_buf(int,int *,char *);
+void file_to_buf(int,int*,char*);
 void file_to_buf_dir(int,int,int*,char*);
-void file_to_buf_i(int,int *,char *);
+void file_to_buf_i(int,int*,char*);
 void file_to_buf_dir_i(int,int,int *,char *);
-void file_name_extract(char *,char *,int,int);
-void dir_name_extract(char *,char *,int ,int );
+void file_name_extract(char*,char*,int,int);
+void dir_name_extract(char*,char*,int,int);
+void division_FILENAME_PATH(char*);
+void find_command(void);
+void exit_command(void);
+void help_command(void);
+int command_classify(char*);
+
+int main(void){
+	char user_input[TEMP];
+	int command_num;
+
+	gettimeofday(&start_time,NULL);//타이머 시작
+	
+	while(1){
+		printf("20182601> ");
+		memset(&s_file,0,sizeof(struct s_find_file));
+		memset(&s_store,0,sizeof(struct s_store_file));
+		command_num=command_classify(user_input);
+
+		if(command_num==ENTER) continue;
+		else if(command_num==FIND){
+			division_FILENAME_PATH(user_input);
+			find_command();
+		}
+		else if(command_num==EXIT) exit_command();
+		else if(command_num==HELP) help_command();
+		else {
+			fprintf(stderr,"input error");
+			exit(1);
+		}
+	}
+	return 0;
+} 
 
 void division_FILENAME_PATH(char *user_input){//파일 이름과 경로 구분
 	int i=5,j=0; //i:"find" except
@@ -78,7 +109,6 @@ void division_FILENAME_PATH(char *user_input){//파일 이름과 경로 구분
 void find_command(void){
 	char real_path[TEMP];
 	
-	
 	//상대경로 -> 절대경로
 	if(realpath(s_file.path,real_path)==NULL){
 		printf("(None path)\n");
@@ -88,6 +118,7 @@ void find_command(void){
 	strcpy(s_file.path,real_path);
 	
    	file_num=0, file_index=0;
+	s_store[0].size=-1;
 	find_dfs(s_file.path);
 	file_num=file_index;
 	if(!file_index) fprintf(stderr,"not file\n");
@@ -112,9 +143,10 @@ void find_dfs(char *path){
 	strcpy(file_path,path);
 	strcat(file_path,"/");
 	strcat(file_path,s_file.filename);
+
+	dir_weight=dir_weight_dfs(path,dir_weight);
 	//파일 찾으면
-	if(stat(file_path,&file)==0){
-		dir_weight=dir_weight_dfs(path,dir_weight);
+	if(stat(file_path,&file)==0&&(file_index==0||s_store[0].size==file.st_size||dir_weight==s_store[0].size)){
 		strcpy(s_store[file_index].filename,s_file.filename);
 		strcpy(s_store[file_index].path,path);
 		strcpy(s_store[file_index].file_path,file_path);
@@ -129,13 +161,12 @@ void find_dfs(char *path){
 	}
 	for(int i=0;i<count;i++){
 		memset(lowpath,0,sizeof(lowpath));
-//        if(!strcmp(namelist[i]->d_name,"..")) continue;
-//        if(!strcmp(namelist[i]->d_name,".")) continue;
         if(!strcmp(namelist[i]->d_name,"proc")) continue;
+        if(!strcmp(namelist[i]->d_name,"X11")) continue;
         if(!strcmp(namelist[i]->d_name,"run")) continue;
         if(!strcmp(namelist[i]->d_name,"snap")) continue;
         if(!strcmp(namelist[i]->d_name,"sys")) continue;
-//      if(!strcmp(namelist[i]->d_name,"usr")) continue;
+      if(!strcmp(namelist[i]->d_name,"usr")) continue;
 		if(namelist[i]->d_name[0]=='.') continue;//부모, 자기디렉토리 제외
 		else{
 			str_length=strlen(path);
@@ -161,17 +192,19 @@ void find_dfs(char *path){
 
 void print_file_info(struct stat file,int dir_weight){
 	struct tm *t;
-	    char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
+    char *rwx[8]={"---","--x","-w-","-wx","r--","r-x","rw-","rwx"};
 
-    if(!file_index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); //if index=0
+    if(!file_index) printf("Index Size Mode       Blocks Links UID  GID  Access            Change            Modify            Path\n"); 
     printf("%-6d",file_index);
     if(S_ISDIR(file.st_mode)){
         printf("%-5d",dir_weight);
         printf("d");
+		s_store[file_index].size=dir_weight;
     }
     else{
         printf("%-5ld",(long)file.st_size);
         printf("-");
+		s_store[file_index].size=file.st_size;
     }
     printf("%s%s%s ",rwx[(file.st_mode&0700)>>6],rwx[(file.st_mode&070)>>3],rwx[file.st_mode&07]);
     printf("%-7lld",(long long)file.st_blocks);
@@ -209,7 +242,6 @@ int dir_weight_dfs(char *path,int dir_weight){
 //		printf("%s\n",path);//tmp
 	}
 	
-
 	//파일+경로
 	if(!strcmp(path,"/")){
 		strcpy(file_path,"/");
@@ -225,13 +257,12 @@ int dir_weight_dfs(char *path,int dir_weight){
 	}
 	for(int i=0;i<count;i++){
 		memset(lowpath,0,sizeof(lowpath));
-//        if(!strcmp(namelist[i]->d_name,"..")) continue;
-//        if(!strcmp(namelist[i]->d_name,".")) continue;
         if(!strcmp(namelist[i]->d_name,"proc")) continue;
+        if(!strcmp(namelist[i]->d_name,"X11")) continue;
         if(!strcmp(namelist[i]->d_name,"run")) continue;
         if(!strcmp(namelist[i]->d_name,"snap")) continue;
         if(!strcmp(namelist[i]->d_name,"sys")) continue;
-//      if(!strcmp(namelist[i]->d_name,"usr")) continue;
+      if(!strcmp(namelist[i]->d_name,"usr")) continue;
 		if(namelist[i]->d_name[0]=='.') continue;//부모, 자기디렉토리 제외
 		else{
 			str_length=strlen(path);
@@ -294,7 +325,7 @@ int find_choose(){
 		if(option=='\0') file_diff(0,index_num,0);
         else if(option=='q') find_option_q_file(0,index_num);
         else if(option=='s') find_option_s_file(0,index_num);
-        else if(option=='i') find_option_i_file(0,index_num);
+        else if(option=='i') file_diff(0,index_num,1);
         else if(option=='r') file_diff(0,index_num,0);
         else {
             fprintf(stderr,"your type option is non_option\n");
@@ -319,7 +350,6 @@ int find_choose(){
 }
 	
 void file_diff(int index1,int index2,int option){
-	
     struct file_content f1;
     struct file_content f2;
     char buf[TEMP];
@@ -488,9 +518,9 @@ void file_diff(int index1,int index2,int option){
         	if(o1>=line1&&n1>=line2) break;
             continue;
         }
-
     }
 }
+
 void row(struct file_content f,int target_line,char *buf){
     int i=0;
     int j=f.line[target_line]+1;
@@ -512,6 +542,7 @@ void file_to_buf(int index, int *length,char *buf){
     }
     buf[*length]=0;
 }
+
 void file_to_buf_dir(int N,int index,int *length,char *buf){
 //	printf("file_to_buf_dir");
 	int fd;
@@ -523,6 +554,7 @@ void file_to_buf_dir(int N,int index,int *length,char *buf){
 	}
     buf[*length]=0;
 }
+
 void file_to_buf_dir_i(int N,int index,int *length,char *buf){
 	int fd;
 	if((fd=open(s_dir[N][index].file_path,O_RDONLY))<0){
@@ -534,7 +566,6 @@ void file_to_buf_dir_i(int N,int index,int *length,char *buf){
     buf[*length]=0;
     for(int i=0;i<*length;i++) if(buf[i]>='A'&&buf[i]<='Z') buf[i]+=32;
 }
-
 
 void file_to_buf_i(int index, int *length,char *buf){
     int fd;
@@ -712,9 +743,8 @@ void find_option_s_file(int index1,int index2){
     }
 
 }
-void find_option_i_file(int index1,int index2){
-	 file_diff(index1,index2,1);
-}
+
+
 void find_option_q_dir(int index){
 	int length_1=0;
 	int length_2=0;
@@ -791,6 +821,7 @@ void find_option_s_dir(int index){
 		}
 	}
 }
+
 void file_name_extract(char *file_1,char *file_2,int index1,int index2){
 	int i=0;
 	int j=0;
@@ -804,6 +835,7 @@ void file_name_extract(char *file_1,char *file_2,int index1,int index2){
 	k=0;
 	while(s_store[index2].file_path[j]!=0) file_2[k++]=s_store[index2].file_path[j++];
 }
+
 void dir_name_extract(char *file_1,char *file_2,int index1,int index2){
 	int i=0,j=0,k=0;
 	memset(file_1,0,TEMP);memset(file_2,0,TEMP);
@@ -817,7 +849,6 @@ void dir_name_extract(char *file_1,char *file_2,int index1,int index2){
 	//printf("extract : %s\n",file_1);//temp
 	while(s_dir[1][index2].file_path[j]!=0) file_2[k++]=s_dir[1][index2].file_path[j++];
 	while(s_dir[1][index2].file_path[j]!='/')file_2[--k]=0,j--;
-	
 }
 
 int command_classify(char *result){ //classify command
@@ -846,39 +877,13 @@ void exit_command(void){    //exit command
 }
 
 void help_command(void){    //help command
-    printf("Usage:\n\t> find [FILENAME] [PATH]\n\t\t>> [INDEX] [OPTION ...]\n\t> help\n\t exit\n\n");
-    printf("\t[OPTION ...]");
-    printf("\n\t q : report only when files differ");
-    printf("\n\t s : report when two files are the same");
-    printf("\n\t i : ignore case differences in file contents");
-    printf("\n\t r : recursively compare any subdirectories found\n");
-}
-
-
-
-int main(void){
-	char user_input[TEMP];
-	int command_num;
-
-	gettimeofday(&start_time,NULL);//타이머 시작
-	
-	while(1){
-		printf("20182601> ");
-		memset(&s_file,0,sizeof(struct s_find_file));
-		memset(&s_store,0,sizeof(struct s_store_file));
-		command_num=command_classify(user_input);
-
-		if(command_num==ENTER) continue;
-		else if(command_num==FIND){
-			division_FILENAME_PATH(user_input);
-			find_command();
-		}
-		else if(command_num==EXIT) exit_command();
-		else if(command_num==HELP) help_command();
-		else {
-			fprintf(stderr,"input error");
-			exit(1);
-		}
-	}
-	return 0;
+    printf("Usage:\n   > find [FILENAME] [PATH]\t : find file and show info\n");
+	printf("       >> [INDEX] [OPTION ...]\t : compare file\n");
+	printf("   > help : show command\n");
+	printf("   > exit : show runtime and exit\n\n");
+    printf("   [OPTION ...]");
+    printf("\n    q : report only when files differ");
+    printf("\n    s : report when two files are the same");
+    printf("\n    i : ignore case differences in file contents");
+    printf("\n    r : recursively compare any subdirectories found\n");
 }
