@@ -8,19 +8,16 @@
 #include <stdlib.h> 
 #include <errno.h> 
 
-#define TABLE_SIZE 1024
-#define BUFFER_SIZE 1024
-#define add(a,b) O1
 
 
 int main(void){
-	int fd;
-	int length;
-	char buf[100];
-
-	if(fd=open("b",O_RDONLY));
-	if((length=read(fd,buf,10)>0));
-	printf("length: %d\n",length);
-	printf("%c\n",buf[0]);
+	unsigned char flag=0;
+	printf("%d\n",flag|=1);
+	printf("%d\n",flag|=2);
+	printf("%d\n",flag|=3);
+	printf("%d\n",flag&1);
+	printf("%d\n",flag&~1);
+	flag=7;
+	printf("%d\n",flag^=2);
 }
 	
