@@ -8,22 +8,27 @@
 #define BUFFER_SIZE 1024
 #define WORD_MAX 100
 
+
 int main(void){
 	int fd;
 	int length=0,offset=0,count=0;
-	char *fname="ssu_test.txt";
 	char buf[WORD_MAX][BUFFER_SIZE];
-	int i;
+	char *fname="ssu_test.txt";
+	int i,k=0;
 	
 	if((fd=open(fname,O_RDONLY))<0){
 		fprintf(stderr,"open error for %s .\n",fname);
 		exit(1);
 	}
 
-	for(int k=0;k<WORD_MAX;k++){
-		if(read(fd,buf[k],BUFFER_SIZE)<0) break;
-
-		for(i=0;i<BUFFER_SIZE;i++){
+	/*
+	for(length=0;length<WORD_MAX;length++){
+		if(read(fd,buf[length],BUFFER_SIZE)<=0){
+			break;
+		}
+		*/
+	while((length=read(fd,buf[k],BUFFER_SIZE))>0){
+		for(i=0;i<length;i++){
 			if(buf[k][i]=='\n'){
 				offset=offset+i+1;
 				lseek(fd,offset,SEEK_SET);
@@ -31,8 +36,8 @@ int main(void){
 				break;
 			}
 		}
+		k++;
 	}
-	count--;
 	close(fd);
 
 	for(i=0;i<count;i++)
