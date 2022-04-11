@@ -1,4 +1,6 @@
-#include "ssu_h.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 int main(void){
 	int argc=0;
@@ -15,21 +17,19 @@ int main(void){
 		if(argc==0)
 			continue;
 		if(!strcmp(argv[0],"fmd5")){
-			md5_sha1=FMD5;
-			command_find(argc,argv);
+//			command_find(argc,argv);
 		}
 		else if(!strcmp(argv[0],"fsha1")){
-			md5_sha1=FSHA1;
-			command_find(argc,argv);
+//			command_find(argc,argv);
 		}
 		else if(!strcmp(argv[0],"help"))
-			command_help();
+//			command_help();
 		else if(!strcmp(argv[0],"exit")){
 			printf("Prompt End\n");
 			break;
 		}
 		else
-			command_help();
+//			command_help();
 	}
 
 	exit(0);
