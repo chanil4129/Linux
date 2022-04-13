@@ -2,10 +2,10 @@ all: ssu_find_md5 ssu_find_sha1 ssu_help ssu_sdup
 CC=gcc
 
 ssu_find_md5: ssu_find_md5.o ssu_command.o
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ -lcrypto
 
 ssu_find_sha1: ssu_find_sha1.o ssu_command.o
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ -lcrypto
 
 ssu_help: ssu_help.o
 	$(CC) -o $@ $^

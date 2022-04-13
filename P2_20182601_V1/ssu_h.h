@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
@@ -15,6 +16,7 @@
 #define FALSE 0
 #define ARGMAX 5
 #define BUFMAX 1024
+#define BUFSIZE 1024*16
 #define FILEMAX 255
 #define PATHMAX BUFMAX*4
 #define REGFILE 1
@@ -29,7 +31,7 @@ typedef struct dirinfo{
 
 //파일 정보
 typedef struct fileinfo{
-	char filename[FILEMAX];
+	char name[FILEMAX];
 	char path[PATHMAX];
 	long long size;
 	int depth;
@@ -68,6 +70,9 @@ int Qempty(path_queue pq);
 void Qpush(path_queue pq, dirinfo data);
 void Qpop(path_queue pq);
 void Qpeek(path_queue pq,dirinfo *f_dir);
+void Dpush(fileinfo f);
 int split(char *string, char *seperator, char *argv[]);
 long long unit_to_byte(char *argv);
 long long file_size(char *path);
+void Qsort(int start, int end);
+void print_dup(void);

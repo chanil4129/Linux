@@ -21,73 +21,63 @@ long long unit_to_byte(char *argv){
     char *arr[20];
     int count;
     int i=0;
+	int KMG;//KB,MB,GB 구분
+	char *unit_argv=(char *)malloc(sizeof(argv));
+	strcpy(unit_argv,argv);
 
-    length=strlen(argv);
-    for(i=0;i<length;i++) if(argv[i]<'0'||argv[i]>'9'||argv[i]!='.') break;
+    length=strlen(unit_argv);
+    for(i=0;i<length;i++) {
+		if(unit_argv[i]>='0'&&unit_argv[i]<='9'||unit_argv[i]=='.') 
+			continue;
+		break;
+	}
 
-    unit=argv+i;
+    unit=unit_argv+i;
     //byte
     if((length-i)==0||!strcmp(unit,"BYTE")||!strcmp(unit,"byte")){
-        return atoll(argv);
+        return atoll(unit_argv);
     }
     //kb,mb,gb
-    count=split(argv,".",arr);
-    if(count!=1||count!=2){
-        return -1;
-    }
-    if(!strcmp(unit,"KB")||!strcmp(unit,"kb")) {
-        for(i=0;i<3;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][3]='\0';
-    }
-    else if(!strcmp(unit,"MB")||!strcmp(unit,"mb")) {
-        for(i=0;i<6;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][6]='\0';
-    }
-    else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) {
-        for(i=0;i<9;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][9]='\0';
-    }
-    else
-        return -1;
-    strcat(arr[0],arr[1]);
+    if(!strcmp(unit,"KB")||!strcmp(unit,"kb")) KMG=3;
+    else if(!strcmp(unit,"MB")||!strcmp(unit,"mb")) KMG=6;
+    else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) KMG=9;
+	unit_argv[i]='\0';
+//	unit='\0';
+
+	//"숫자"혹은"." 외에 들어오면 에러처리
+    count=split(unit_argv,".",arr);
+	for(i=0;i<count;i++){
+		for(int j=0;j<strlen(arr[i]);j++){
+			if(arr[i][j]>='0'&&arr[i][j]<='9'||arr[i][j]=='.')
+				continue;
+			return -1;
+		}
+	}
+	if(count==1){
+		for(i=0;i<KMG;i++)
+			strcat(arr[0],"0");
+	}
+	else if(count==2){
+		length=strlen(arr[1]);
+		for(i=0;i<KMG-length;i++)
+			strcat(arr[1],"0");
+		strcat(arr[0],arr[1]);
+	}
+	else 
+		return -1;
+	
     return atoll(arr[0]);
 }
 
 //파일 사이즈 추출
+/*
 long long file_size(char *fname){
-	FILE *fp;
-	char *buf;
-	long unit;
-	unsigned int total_size=0;
-	unsigned int current_size=0;
+	int fd;
 
-	if((fp=fopen(fname,"rb"))==NULL){
-		fprintf(stderr,"fopen error for %s\n",fname);
-		exit(1);
+	if((fd=open(fname,O_RDONLY))<0){
+		fprintf(stderr,"file_size extract open error for %s\n",fname);
 	}
-
-	fseek(fp,0,SEEK_END);
-	unit=ftell(fp);
-	fseek(fp,0,SEEK_SET);
-
-	buf=(char*)malloc(sizeof(char)*unit);
-
-	while((current_size=fread(&buf[total_size],sizeof(char),unit-total_size,fp))>0){
-		total_size+=current_size;
-	}
-
-	if(total_size!=unit){
-		fprintf(stderr,"not read all file");
-		exit(1);
-	}
+	
+	
 }
-
+*/
