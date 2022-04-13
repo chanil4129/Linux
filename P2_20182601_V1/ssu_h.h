@@ -75,4 +75,4 @@ int split(char *string, char *seperator, char *argv[]);
 long long unit_to_byte(char *argv);
 long long file_size(char *path);
 void Qsort(int start, int end);
-void print_dup(void);
+void print_dup(char *dirname);

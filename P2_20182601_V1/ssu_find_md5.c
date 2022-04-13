@@ -55,10 +55,6 @@ int main(int argc,char *argv[]){
     }
 
     //[TARGET_DIR]
-	/*
-	if(!strcmp(argv[4],"~")||!strcmp(argv[4],"~/"))
-		strcpy(argv[4],"/home");
-	*/
 	dirbuf[0]=0;
 	if(argv[4][0]=='~'){
 		strcpy(dirbuf,"/home");
@@ -96,8 +92,8 @@ int main(int argc,char *argv[]){
 
 	Qsort(0,file_list_count-1);
 
-	print_dup();
-	printf("Seraching time: %ld:%06ld\n",end_t.tv_sec,end_t.tv_usec);
+	print_dup(dirname);
+	printf("Seraching time: %ld:%06ld\n\n",end_t.tv_sec,end_t.tv_usec);
 	/*
 	for(int i=0;i<file_list_count;i++){
 		printf("%lld  %s\n",file_list[i]->data.size,file_list[i]->next->data.name);
@@ -179,6 +175,20 @@ void read_directory(char *dirname){
 					continue;
 				}
 				//[EXTENSION],[MINSIZE],[MAXSIZE] 확인
+				char *ext;
+				strcpy(ext,namelist[i]->d_name);
+				for(int i=0;i<strlen(namelist[i]->d_name);i++){
+					if(ext[i]=='.') {
+						ext+=(i+1);
+						break;
+					}
+				}
+				
+				if(strcmp(extension,"*")){
+					strcmp(extension,ext)
+					continue;
+				}
+				
 				
 
 				//조건에 맞다면 file_list에 push
@@ -376,7 +386,7 @@ void Qsort(int start, int end){
 	Qsort(j+1,end);
 }
 
-void print_dup(void){
+void print_dup(char *dirname){
 	int count=0;
 	int i=0;
 	for(i=0;i<file_list_count;i++){
@@ -399,5 +409,6 @@ void print_dup(void){
 		}
 		printf("\n");
 	}
-
+	if(count==0)
+		printf("No duplicates in %s\n",dirname);
 }
