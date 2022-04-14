@@ -118,12 +118,13 @@ int main(int argc,char *argv[]){
 		int d_idx;
 		int input_error=0;
 		int y_n;
+		int *del_list;
+		long long *I_time;
 
 		if(dup_list_count==0)
 			exit(0);
 
 		printf(">> ");
-		printf("%s\n",arr[0]);
 		fgets(input,sizeof(input),stdin);
 		count=split(input," ",arr);
 
@@ -147,41 +148,92 @@ int main(int argc,char *argv[]){
 				printf("ERROR: out of Identical files index\n");
 				continue;
 			}
+			d_idx=atoi(arr[2]);
 		}
 
 		idx=atoi(arr[0]);
-		d_idx=atoi(arr[2]);
 
-		printf("%s\n",arr[1]);
+		//option d
 		if(arr[1][0]=='d'){
 			path_file_extract(path_file,idx,d_idx);
 			printf("\"%s\" has been deleted in #%d\n\n",path_file,idx);
 			Dpop(idx,d_idx);
 			print_dup(dirname);
 		}
+		//option i
 		else if(arr[1][0]=='i'){
-			printf("what\n");
-			for(int i=1;i<set_count[idx];i++){
+			del_list=(int *)malloc(sizeof(int)*(set_count[idx]+1));
+			memset(del_list,0,sizeof(del_list));
+			for(int i=1;i<=set_count[idx];i++){
 				path_file_extract(path_file,idx,i);
-				printf("Delete \"%s\"? [y/n]",path_file);
-//				getchar();
-//				y_n=fgetc(stdin);
-				y_n=getchar();
+				printf("Delete \"%s\"? [y/n] ",path_file);
+				y_n=fgetc(stdin);
 				if(y_n=='y'||y_n=='Y')
-					Dpop(idx,i);
+					del_list[i]=1;
 				else if(y_n!='n'&&y_n!='N'){
 					printf("Input Error\n");
 					input_error=1;
 					break;
 				}
+				getchar();
 			}
-			if(input_error==0)
+			printf("\n");
+			if(input_error==0){
+				int temp=0;
+				for(int i=1;i<=set_count[idx];i++){
+					if(del_list[i]==1){
+						Dpop(idx,i-temp);
+						temp++;
+					}
+				}
 				print_dup(dirname);
+			}
 		}
-		else if(arr[1][0]=='f')
-			option_f(idx);
-		else if(arr[1][0]=='t')
-			option_t(idx);
+		//option f와 option t
+		else if(arr[1][0]=='f'||arr[1][0]=='t'){
+//			left_list=(f_node **)malloc(sizeof(f_node *));
+			f_node *left;
+			struct stat t_statbuf;
+			long long max=0;
+			int i;
+			int temp=0;
+
+			I_time=(long long *)malloc(sizeof(long long)*(set_count[idx]+1));
+			memset(I_time,0,sizeof(I_time));
+			for(i=1;i<=set_count[idx];i++){
+				path_file_extract(path_file,idx,i);
+				if(lstat(path_file,&t_statbuf)<0){
+					fprintf(stderr,"lstat error for %s\n",path_file);
+					exit(1);
+				}
+				I_time[i]=Integer_time(t_statbuf.st_mtime);
+			}
+			max=I_time[1];
+			d_idx=1;
+//			qsort(I_time,sizeof(I_time)/sizeof(long long),sizeof(long long),time_compare);
+			for(i=1;i<=set_count[idx];i++){
+				if(I_time[d_idx]>max){
+					max=I_time[d_idx];
+					d_idx=i;
+				}
+			}
+			path_file_extract(path_file,idx,d_idx);
+			if(arr[1][0]=='f'){
+				for(i=1;i<d_idx;i++)
+					Dpop(idx,i);
+				for(i=d_idx+1;i<=set_count[idx];i++)
+					Dpop(idx,i);
+				printf("Left file in #%d : %s (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
+			}
+			else if(arr[1][0]=='t'){
+				for(i=1;i<d_idx;i++)
+					Dtrash(idx,i);
+				for(i=d_idx+1;i<=set_count[idx];i++)
+					Dtrash(idx,i);
+				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
+			}
+			
+		}
 		else
 			printf("Input Error\n");
 	}
@@ -453,6 +505,26 @@ void Dpop(int idx,int s_idx){
 	free(pop);
 }
 
+void Dtrash(int idx,int s_idx){
+	f_node *cur=dup_list[idx];
+    f_node *pop;
+    char path_file[PATHMAX];
+
+    for(int i=1;i<s_idx;i++)
+        cur=cur->next;
+    pop=cur->next;
+    cur->next=pop->next;
+
+    strcpy(path_file,pop->data.path);
+    strcat(path_file,"/");
+    strcat(path_file,pop->data.name);
+	if(rename(path_file,"/trash")<0){
+		fprintf(stderr, "lstat error for %s\n",path_file);
+		exit(1);
+	}
+    free(pop);
+}
+
 void Qsort(int start, int end){
 	if(start>=end){
 		return;
@@ -508,7 +580,7 @@ void print_dup(char *dirname){
 		dup_list=realloc(dup_list,sizeof(f_node *)*(dup_list_count+1));
 		dup_list[dup_list_count]=file_list[i];
 		f_node *cur=dup_list[dup_list_count]->next;
-		set_count=realloc(set_count,sizeof(int)*dup_list_count);
+		set_count=realloc(set_count,sizeof(int)*dup_list_count+1);
 		set_count[dup_list_count]=0;
 		int j=1;
 
@@ -544,15 +616,6 @@ void print_dup(char *dirname){
 	}
 }
 
-void option_d(int idx,int d_idx){
-}
-void option_i(int idx){
-}
-void option_f(int idx){
-}
-void option_t(int idx){
-}
-
 void path_file_extract(char *f,int idx, int d_idx){
 	f_node *cur=dup_list[idx];
 	
@@ -563,3 +626,4 @@ void path_file_extract(char *f,int idx, int d_idx){
 	strcat(f,"/");
 	strcat(f,cur->data.name);
 }
+

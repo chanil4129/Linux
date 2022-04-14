@@ -118,3 +118,20 @@ char* get_time(time_t stime){
     return time;
 }
 
+//최근 수정 시간 정수로 나타내기
+long long Integer_time(time_t stime){
+	char *time=(char *)malloc(sizeof(char)*BUFMAX);
+	struct tm *tm;
+	
+	tm=localtime(&stime);
+    sprintf(time,"%04d%02d%02d%02d%02d%02d",tm->tm_year,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+	
+	return atoll(time);
+}
+
+/*
+//time비교 함수 in qsort
+int time_compare(const void *a,const void *b){
+	return (*(long long *)b-*(long long *)a);
+}
+*/
