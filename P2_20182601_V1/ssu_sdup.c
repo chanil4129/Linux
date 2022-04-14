@@ -15,6 +15,12 @@ int main(void){
         argc=split(input," ",argv);
 		argv[ARGMAX]=NULL;
 
+		/*
+		for(int i=0;i<5;i++){
+			printf("argv[%d]:%s\n",i,argv[i]);
+		}
+		*/
+
         if(argc==0)
 			continue;
 

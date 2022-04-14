@@ -35,12 +35,20 @@ long long unit_to_byte(char *argv){
     unit=unit_argv+i;
     //byte
     if((length-i)==0||!strcmp(unit,"BYTE")||!strcmp(unit,"byte")){
-        return atoll(unit_argv);
+		/*
+		unit_argv[i]=0;
+		if(!strcmp(unit_argv,"0")){
+			return 0;
+		}
+        return atoll(unit_argv)?atoll(unit_argv):-1;
+		*/
+		return atoll(unit_argv);
     }
     //kb,mb,gb
     if(!strcmp(unit,"KB")||!strcmp(unit,"kb")) KMG=3;
     else if(!strcmp(unit,"MB")||!strcmp(unit,"mb")) KMG=6;
     else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) KMG=9;
+	else return-1;
 	unit_argv[i]='\0';
 //	unit='\0';
 
@@ -65,19 +73,48 @@ long long unit_to_byte(char *argv){
 	}
 	else 
 		return -1;
-	
-    return atoll(arr[0]);
-}
 
-//파일 사이즈 추출
-/*
-long long file_size(char *fname){
-	int fd;
-
-	if((fd=open(fname,O_RDONLY))<0){
-		fprintf(stderr,"file_size extract open error for %s\n",fname);
+	/*
+	for(i=0;i<strlen(arr[0]);i++){
+		if(arr[0][i]!='0')
+			break;
+		return 0;
 	}
-	
-	
+
+	return
+		atoll(arr[0])?atoll(arr[0]):-1;
+		*/
+	return atoll(arr[0]);
 }
-*/
+
+//파일 사이즈 , 붙여서 나타내기
+void print_size(long long size,char *p_size){
+    char temp[26];
+    char *p;
+    int i;
+
+    p=temp;
+    for(i=0;i<20&&size>0;i++){
+        if(i&&(i%3)==0)
+            *p++=',';
+        *p++=(size%10)+'0';
+        size/=10;
+    }
+    p--;
+
+    while(p>=temp)
+        *p_size++=*p--;
+    *p_size=0;
+}
+
+//시간 출력
+char* get_time(time_t stime){
+    char *time=(char *)malloc(sizeof(char)*BUFMAX);
+    struct tm *tm;
+
+    tm=localtime(&stime);
+    sprintf(time,"%04d-%02d-%02d %02d:%02d:%02d",1900+tm->tm_year,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+
+    return time;
+}
+

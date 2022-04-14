@@ -21,7 +21,7 @@
 #define PATHMAX BUFMAX*4
 #define REGFILE 1
 #define DIRECTORY 2
-#define EXTENTIONMAX 7
+#define EXTENSIONMAX 7
 
 //BFS 디렉토리 정보
 typedef struct dirinfo{
@@ -61,7 +61,7 @@ fileinfo target_dir;//[TARGET_DIRECTORY]
 int minsize_tilde;//[MINSIZE] ~ 일때 구분
 int maxsize_tilde;//[MAXSIZE] ~ 일때 구분
 long long minsize,maxsize;//[MINSIZE],[MAXSIZE] 범위
-char extention[EXTENTIONMAX];//[EXTENSION] 확장명
+char extension[EXTENSIONMAX];//[EXTENSION] 확장명
 
 
 void read_directory(char *dirname);
@@ -71,8 +71,16 @@ void Qpush(path_queue pq, dirinfo data);
 void Qpop(path_queue pq);
 void Qpeek(path_queue pq,dirinfo *f_dir);
 void Dpush(fileinfo f);
+void Dpop(int idx,int s_idx);
 int split(char *string, char *seperator, char *argv[]);
 long long unit_to_byte(char *argv);
 long long file_size(char *path);
 void Qsort(int start, int end);
 void print_dup(char *dirname);
+void print_size(long long size,char *p_size);
+char* get_time(time_t stime);
+void option_d(int idx,int d_idx);
+void option_i(int idx);
+void option_f(int idx);
+void option_t(int idx);
+void path_file_extract(char *f,int idx, int d_idx);

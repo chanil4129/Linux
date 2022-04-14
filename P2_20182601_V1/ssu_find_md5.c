@@ -7,6 +7,10 @@
 f_node **file_list;
 int file_list_count;
 
+f_node **dup_list;
+int dup_list_count;
+int *set_count;
+
 void fmd5(char *file_path,unsigned char *md);
 
 int main(int argc,char *argv[]){
@@ -24,10 +28,10 @@ int main(int argc,char *argv[]){
     //[FILE_EXTENSION]
     char *ptr;
     length=strlen(argv[1]);
-    if(!strcmp(argv[1],"*")) strcpy(extention,argv[1]);
+    if(!strcmp(argv[1],"*")) strcpy(extension,argv[1]);
     else if(argv[1][0]=='*'&&argv[1][1]=='.'){
         ptr=argv[1]+2;
-        strcpy(extention,ptr);
+        strcpy(extension,ptr);
     }   
     else{
         printf("ERROR: FILE_EXTENSION error\n");
@@ -37,32 +41,42 @@ int main(int argc,char *argv[]){
     //[MINSIZE]
     minsize_tilde=0;
     length=strlen(argv[2]);
-    if(length==1||argv[2][0]=='~') minsize_tilde=1;
-    else minsize=unit_to_byte(argv[2]);
-    if(minsize==-1){
-        printf("ERROR: MINSIZE error\n");
-        exit(1);
-    }   
+    if(length==1&&argv[2][0]=='~') minsize_tilde=1;
+    else {
+		minsize=unit_to_byte(argv[2]);
+		if(minsize==-1){
+			printf("ERROR: MINSIZE error\n");
+			exit(1);
+		}   
+		else if(minsize==0){
+			printf("ERROR: MINSIZE>0\n");
+			exit(1);
+		}
+	}
 
-    //[MAXSIZE]
-    maxsize_tilde=0;
-    length=strlen(argv[3]);
-    if(length==1||argv[3][0]=='~') maxsize_tilde=1;
-    else maxsize=unit_to_byte(argv[3]);
-    if(maxsize==-1){
-        printf("ERROR: MAXSIZE error\n");
-        exit(1);
-    }
+	//[MAXSIZE]
+	maxsize_tilde=0;
+	length=strlen(argv[3]);
+	if(length==1&&argv[3][0]=='~') maxsize_tilde=1;
+	else {
+		maxsize=unit_to_byte(argv[3]);
+		if(maxsize==-1){
+			printf("ERROR: MAXSIZE error\n");
+			exit(1);
+		}
+		else if(maxsize==0){
+			printf("ERROR: MAXSIZE>0\n");
+			exit(1);
+		}
+	}
 
-    //[TARGET_DIR]
+	//[TARGET_DIR]
 	dirbuf[0]=0;
 	if(argv[4][0]=='~'){
 		strcpy(dirbuf,"/home");
 		argv[4]++;
 	}
 	strcat(dirbuf,argv[4]);
-
-	printf("%s\n",dirbuf);
 
     if(realpath(dirbuf,dirname)==NULL){
         printf("ERROR: Path exist error\n");
@@ -94,14 +108,83 @@ int main(int argc,char *argv[]){
 
 	print_dup(dirname);
 	printf("Seraching time: %ld:%06ld\n\n",end_t.tv_sec,end_t.tv_usec);
-	/*
-	for(int i=0;i<file_list_count;i++){
-		printf("%lld  %s\n",file_list[i]->data.size,file_list[i]->next->data.name);
-		//printf("%s\n",file_list[i]->data.md);
-		//printf("%s\n",file_list[i]->next->data.md);
+
+	while(1){
+		char path_file[PATHMAX];
+		char input[BUFMAX];
+		char *arr[10];
+		int count;
+		int idx;
+		int d_idx;
+		int input_error=0;
+		int y_n;
+
+		if(dup_list_count==0)
+			exit(0);
+
+		printf(">> ");
+		printf("%s\n",arr[0]);
+		fgets(input,sizeof(input),stdin);
+		count=split(input," ",arr);
+
+		if(!strcmp(arr[0],"exit\n")){
+			printf("Back to Prompt\n");
+			exit(0);
+		}
+
+		if(count!=2&&count!=3){
+			printf("ERROR: Arguments error\n");
+			continue;
+		}
+
+		if(atoi(arr[0])<0||atoi(arr[0])>dup_list_count){
+			printf("ERROR: out of Identical files index\n");
+			continue;
+		}
+
+		if(count==3){
+			if(atoi(arr[2])<0||atoi(arr[2])>set_count[atoi(arr[0])]){
+				printf("ERROR: out of Identical files index\n");
+				continue;
+			}
+		}
+
+		idx=atoi(arr[0]);
+		d_idx=atoi(arr[2]);
+
+		printf("%s\n",arr[1]);
+		if(arr[1][0]=='d'){
+			path_file_extract(path_file,idx,d_idx);
+			printf("\"%s\" has been deleted in #%d\n\n",path_file,idx);
+			Dpop(idx,d_idx);
+			print_dup(dirname);
+		}
+		else if(arr[1][0]=='i'){
+			printf("what\n");
+			for(int i=1;i<set_count[idx];i++){
+				path_file_extract(path_file,idx,i);
+				printf("Delete \"%s\"? [y/n]",path_file);
+//				getchar();
+//				y_n=fgetc(stdin);
+				y_n=getchar();
+				if(y_n=='y'||y_n=='Y')
+					Dpop(idx,i);
+				else if(y_n!='n'&&y_n!='N'){
+					printf("Input Error\n");
+					input_error=1;
+					break;
+				}
+			}
+			if(input_error==0)
+				print_dup(dirname);
+		}
+		else if(arr[1][0]=='f')
+			option_f(idx);
+		else if(arr[1][0]=='t')
+			option_t(idx);
+		else
+			printf("Input Error\n");
 	}
-	*/
-		
 	exit(0);
 }
 
@@ -170,26 +253,28 @@ void read_directory(char *dirname){
 //				printf("%d: %s\n",depth,r_dir.path);
 			}
 			else if(S_ISREG(statbuf.st_mode)){
+//				printf("dir: %s\n",namelist[i]->d_name);
+				//FILESIZE가 0이면 삭제
 				if(statbuf.st_size==0){
 					remove(r_dir.path);
 					continue;
 				}
-				//[EXTENSION],[MINSIZE],[MAXSIZE] 확인
-				char *ext;
-				strcpy(ext,namelist[i]->d_name);
-				for(int i=0;i<strlen(namelist[i]->d_name);i++){
-					if(ext[i]=='.') {
-						ext+=(i+1);
-						break;
-					}
+
+				//[EXTENSION] 확인
+				char filename[FILEMAX];
+				char *ext="";
+				strcpy(filename,namelist[i]->d_name);
+				if(strstr(filename,".")!=NULL){
+					ext=strrchr(filename,'.');
+					ext++;
 				}
 				
-				if(strcmp(extension,"*")){
-					strcmp(extension,ext)
+				if(strcmp(extension,"*")&&strcmp(extension,ext))
 					continue;
-				}
 				
-				
+				//[MINSIZE],[MAXSIZE] 확인
+				if(minsize_tilde==0&&(long long)statbuf.st_size<minsize||maxsize_tilde==0&&statbuf.st_size>maxsize)
+					continue;
 
 				//조건에 맞다면 file_list에 push
 				fileinfo file;
@@ -351,6 +436,23 @@ void Dpush(fileinfo f){
 	}
 }
 
+void Dpop(int idx,int s_idx){
+	f_node *cur=dup_list[idx];
+	f_node *pop;
+	char path_file[PATHMAX];
+
+	for(int i=1;i<s_idx;i++)
+		cur=cur->next;
+	pop=cur->next;
+	cur->next=pop->next;
+
+	strcpy(path_file,pop->data.path);
+	strcat(path_file,"/");
+	strcat(path_file,pop->data.name);
+	remove(path_file);
+	free(pop);
+}
+
 void Qsort(int start, int end){
 	if(start>=end){
 		return;
@@ -387,28 +489,77 @@ void Qsort(int start, int end){
 }
 
 void print_dup(char *dirname){
-	int count=0;
+	char print_file_size[26];
 	int i=0;
+	struct stat statbuf;
+	char p_file[PATHMAX];
+
+	free(dup_list);
+	free(set_count);
+	dup_list_count=0;
+
+	dup_list=(f_node **)malloc(sizeof(f_node *));
+	set_count=(int *)malloc(sizeof(int));
 	for(i=0;i<file_list_count;i++){
 		if(file_list[i]->next->next==NULL)
 			continue;
 
-		count++;
-		f_node *cur=file_list[i]->next;
+		dup_list_count++;
+		dup_list=realloc(dup_list,sizeof(f_node *)*(dup_list_count+1));
+		dup_list[dup_list_count]=file_list[i];
+		f_node *cur=dup_list[dup_list_count]->next;
+		set_count=realloc(set_count,sizeof(int)*dup_list_count);
+		set_count[dup_list_count]=0;
 		int j=1;
 
-		printf("---- Identical files #%d (%lld bytes - ",count,file_list[i]->data    .size);
+		print_size(dup_list[dup_list_count]->data.size,print_file_size);
+		printf("---- Identical files #%d (%s bytes - ",dup_list_count,print_file_size);
 		for(int t=0;t<MD5_DIGEST_LENGTH;t++)
-			printf("%02x",file_list[i]->data.md[t]);
+			printf("%02x",dup_list[dup_list_count]->data.md[t]);
 		printf(") ----\n");
 
 		while(cur!=NULL){
-			printf("[%d] %s/%s\n",j,cur->data.path,cur->data.name);
+			strcpy(p_file,cur->data.path);
+			strcat(p_file,"/");
+			strcat(p_file,cur->data.name);
+
+			if((lstat(p_file,&statbuf)<0)&&(!access(p_file,F_OK))){
+				if(errno==1)
+					continue;
+				fprintf(stderr,"lstat error for %s\n",p_file);
+				exit(1);
+			}
+			printf("[%d] %s ",j,p_file);
+			printf("(mtime : %s) (atime : %s)\n",get_time(statbuf.st_mtime),get_time(statbuf.st_atime));
+			set_count[dup_list_count]++;
 			j++;
 			cur=cur->next;
 		}
 		printf("\n");
 	}
-	if(count==0)
+	if(dup_list_count==0){
 		printf("No duplicates in %s\n",dirname);
+		free(dup_list);
+		free(set_count);
+	}
+}
+
+void option_d(int idx,int d_idx){
+}
+void option_i(int idx){
+}
+void option_f(int idx){
+}
+void option_t(int idx){
+}
+
+void path_file_extract(char *f,int idx, int d_idx){
+	f_node *cur=dup_list[idx];
+	
+	memset(f,0,sizeof(f));
+	for(int i=0;i<d_idx;i++)
+		cur=cur->next;
+	strcpy(f,cur->data.path);
+	strcat(f,"/");
+	strcat(f,cur->data.name);
 }
