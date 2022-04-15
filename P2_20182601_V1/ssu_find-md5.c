@@ -84,6 +84,7 @@ int main(int argc,char *argv[]){
         printf("ERROR: Path exist error\n");
         exit(1);
     }
+	printf("%s\n",dirname);
 
     if(lstat(dirname,&statbuf)<0){
         fprintf(stderr,"lstat error for %s\n",dirname);

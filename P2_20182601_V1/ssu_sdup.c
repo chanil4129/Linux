@@ -7,6 +7,7 @@ int main(void){
     char *argv[ARGMAX+1];
 //	int status;
 
+
     //프롬프트 시작
     while(1) {
         printf("20182601> ");

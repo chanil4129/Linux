@@ -134,7 +134,12 @@ void home_dir(char *home){
 	char buf[1024];
 	size_t bufsize;
 	int ret;
+	int uid=0;
 
+	if(getuid()==0){
+		setuid(1000);
+		uid++;
+	}
 	errno=0;
 
 	if((pwd=getpwuid(getuid()))==NULL){
@@ -148,4 +153,7 @@ void home_dir(char *home){
 		}
 	}
 	strcpy(home,pwd->pw_dir);
+	if(uid){
+		setuid(0);
+	}
 }
