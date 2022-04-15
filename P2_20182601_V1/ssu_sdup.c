@@ -37,13 +37,13 @@ int main(void){
 		else if(pid==0){
 			if(!strcmp(argv[0],"fmd5")){
 				if(pid==0){
-					execv("./ssu_find_md5",argv);
+					execv("./ssu_find-md5",argv);
 					fprintf(stderr,"couldn't execute: fmd5\n");
 				}
 			}
 			else if(!strcmp(argv[0],"fsha1")){
 				if(pid==0){
-					execv("./ssu_find_sha1",argv);
+					execv("./ssu_find-sha1",argv);
 					fprintf(stderr,"couldn't execute: fsha1\n");
 				}
 			}

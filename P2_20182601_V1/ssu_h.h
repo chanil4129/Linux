@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <pwd.h>
 #include <dirent.h>
 #include <openssl/md5.h>
 
@@ -83,3 +84,4 @@ char* get_time(time_t stime);
 void path_file_extract(char *f,int idx, int d_idx);
 long long Integer_time(time_t stime);
 void home_dir(char *);
+void file_extract(char *f,int idx,int d_idx);

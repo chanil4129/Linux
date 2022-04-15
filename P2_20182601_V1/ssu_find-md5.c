@@ -227,19 +227,22 @@ int main(int argc,char *argv[]){
 				}
 				temp=0;
 				for(i=d_idx+1;i<=set_count[idx];i++){
-					Dpop(idx,i-temp);
+					Dpop(idx,2);
 					temp++;
 				}
 				printf("Left file in #%d : %s (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
 			}
 			else if(arr[1][0]=='t'){
+				printf("1\n");//debug
 				for(i=1;i<d_idx;i++){
+				printf("2\n");//debug
 					Dtrash(idx,i-temp);
 					temp++;
 				}
 				temp=0;
 				for(i=d_idx+1;i<=set_count[idx];i++){
-					Dtrash(idx,i-temp);
+				printf("3\n");//debug
+					Dtrash(idx,2);
 					temp++;
 				}
 				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
@@ -516,17 +519,22 @@ void Dpop(int idx,int s_idx){
 void Dtrash(int idx,int s_idx){
 	f_node *cur=dup_list[idx];
     f_node *pop;
-    char path_file[PATHMAX];
+    char file[FILEMAX];
+	char path_file[PATHMAX];
+	char home_path[BUFMAX];
 	char trash_file[PATHMAX];
 	char *ptr;
 	int i=0;
 
 	path_file_extract(path_file,idx,s_idx);
+	file_extract(file,idx,s_idx);
     pop=cur->next;
     cur->next=pop->next;
+	printf("%s\n",path_file);
 
 	while(1){
-		sprintf(trash_file,"%s/%s%d%s","/trash","version",i,"path_file");
+		home_dir(home_path);
+		sprintf(trash_file,"%s/.local/share/Trash/files/version%d%s",home_path,i,file);
 		i++;
 		if(access(trash_file,F_OK)==0)
 			continue;
@@ -645,3 +653,14 @@ void path_file_extract(char *f,int idx, int d_idx){
 	strcat(f,cur->data.name);
 }
 
+void file_extract(char *f,int idx,int d_idx){
+	f_node *cur=dup_list[idx];
+	
+	memset(f,0,sizeof(f));
+	for(int i=0;i<d_idx;i++){
+		if(cur==NULL)
+			printf("Error : node access\n");
+		cur=cur->next;
+	}
+	strcat(f,cur->data.name);
+}
