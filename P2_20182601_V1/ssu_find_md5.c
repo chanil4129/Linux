@@ -212,27 +212,37 @@ int main(int argc,char *argv[]){
 			d_idx=1;
 //			qsort(I_time,sizeof(I_time)/sizeof(long long),sizeof(long long),time_compare);
 			for(i=1;i<=set_count[idx];i++){
-				if(I_time[d_idx]>max){
-					max=I_time[d_idx];
+				if(I_time[i]>max){
+					max=I_time[i];
 					d_idx=i;
 				}
 			}
 			path_file_extract(path_file,idx,d_idx);
 			if(arr[1][0]=='f'){
-				for(i=1;i<d_idx;i++)
-					Dpop(idx,i);
-				for(i=d_idx+1;i<=set_count[idx];i++)
-					Dpop(idx,i);
+				for(i=1;i<d_idx;i++){
+					Dpop(idx,i-temp);
+					temp++;
+				}
+				temp=0;
+				for(i=d_idx+1;i<=set_count[idx];i++){
+					Dpop(idx,i-temp);
+					temp++;
+				}
 				printf("Left file in #%d : %s (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
 			}
 			else if(arr[1][0]=='t'){
-				for(i=1;i<d_idx;i++)
-					Dtrash(idx,i);
-				for(i=d_idx+1;i<=set_count[idx];i++)
-					Dtrash(idx,i);
+				for(i=1;i<d_idx;i++){
+					Dtrash(idx,i-temp);
+					temp++;
+				}
+				temp=0;
+				for(i=d_idx+1;i<=set_count[idx];i++){
+					Dtrash(idx,i-temp);
+					temp++;
+				}
 				printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
 			}
-			
+			print_dup(dirname);
 		}
 		else
 			printf("Input Error\n");
@@ -493,14 +503,10 @@ void Dpop(int idx,int s_idx){
 	f_node *pop;
 	char path_file[PATHMAX];
 
-	for(int i=1;i<s_idx;i++)
-		cur=cur->next;
+	path_file_extract(path_file,idx,s_idx);
 	pop=cur->next;
 	cur->next=pop->next;
 
-	strcpy(path_file,pop->data.path);
-	strcat(path_file,"/");
-	strcat(path_file,pop->data.name);
 	remove(path_file);
 	free(pop);
 }
@@ -509,19 +515,26 @@ void Dtrash(int idx,int s_idx){
 	f_node *cur=dup_list[idx];
     f_node *pop;
     char path_file[PATHMAX];
+	char trash_file[PATHMAX];
+	char *ptr;
+	int i=0;
 
-    for(int i=1;i<s_idx;i++)
-        cur=cur->next;
+	path_file_extract(path_file,idx,s_idx);
     pop=cur->next;
     cur->next=pop->next;
 
-    strcpy(path_file,pop->data.path);
-    strcat(path_file,"/");
-    strcat(path_file,pop->data.name);
-	if(rename(path_file,"/trash")<0){
-		fprintf(stderr, "lstat error for %s\n",path_file);
-		exit(1);
+	while(1){
+		sprintf(trash_file,"%s/%s%d%s","/trash","version",i,"path_file");
+		i++;
+		if(access(trash_file,F_OK)==0)
+			continue;
+		if(rename(path_file,trash_file)<0){
+			fprintf(stderr, "rename error\n");
+			exit(1);
+		}
+		break;
 	}
+	
     free(pop);
 }
 
