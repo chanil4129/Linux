@@ -19,6 +19,7 @@ int main(int argc,char *argv[]){
 	int length;
 	struct timeval begin_t,end_t;
 	char dirbuf[PATHMAX];
+	char *argv_ptr;
 
 	if(argc!=ARGMAX){
 		printf("ERROR: Arguments error\n");
@@ -72,11 +73,12 @@ int main(int argc,char *argv[]){
 
 	//[TARGET_DIR]
 	dirbuf[0]=0;
+	argv_ptr=argv[4];
 	if(argv[4][0]=='~'){
-		strcpy(dirbuf,"/home");
-		argv[4]++;
+		home_dir(dirbuf);
+		argv_ptr++;
 	}
-	strcat(dirbuf,argv[4]);
+	strcat(dirbuf,argv_ptr);
 
     if(realpath(dirbuf,dirname)==NULL){
         printf("ERROR: Path exist error\n");
@@ -144,7 +146,7 @@ int main(int argc,char *argv[]){
 		}
 
 		if(count==3){
-			if(atoi(arr[2])<0||atoi(arr[2])>set_count[atoi(arr[0])]){
+			if(atoi(arr[2])<1||atoi(arr[2])>set_count[atoi(arr[0])]){
 				printf("ERROR: out of Identical files index\n");
 				continue;
 			}
@@ -633,8 +635,11 @@ void path_file_extract(char *f,int idx, int d_idx){
 	f_node *cur=dup_list[idx];
 	
 	memset(f,0,sizeof(f));
-	for(int i=0;i<d_idx;i++)
+	for(int i=0;i<d_idx;i++){
+		if(cur==NULL)
+			printf("Error : node access\n");
 		cur=cur->next;
+	}
 	strcpy(f,cur->data.path);
 	strcat(f,"/");
 	strcat(f,cur->data.name);

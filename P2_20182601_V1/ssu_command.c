@@ -129,9 +129,5 @@ long long Integer_time(time_t stime){
 	return atoll(time);
 }
 
-/*
-//time비교 함수 in qsort
-int time_compare(const void *a,const void *b){
-	return (*(long long *)b-*(long long *)a);
+void home_dir(char *){
 }
-*/

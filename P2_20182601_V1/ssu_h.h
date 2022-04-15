@@ -82,3 +82,4 @@ void print_size(long long size,char *p_size);
 char* get_time(time_t stime);
 void path_file_extract(char *f,int idx, int d_idx);
 long long Integer_time(time_t stime);
+void home_dir(char *);
