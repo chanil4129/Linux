@@ -1,9 +1,5 @@
 #include "ssu_h.h"
 
-#if !defined(_OSD_POSIX) && !defined(__DJGPP__)
-//int read(int, void *, unsigned int);
-#endif
-
 f_node **file_list;
 int file_list_count;
 
@@ -71,11 +67,16 @@ int main(int argc,char *argv[]){
 		}
 	}
 
+	if(maxsize&&minsize&&minsize>=maxsize){
+		printf("ERROR: SIZE scale\n");
+		exit(1);
+	}
+
 	//[TARGET_DIR]
 	dirbuf[0]=0;
 	argv_ptr=argv[4];
 	if(argv[4][0]=='~'){
-		home_dir(dirbuf);
+		strcpy(dirbuf,getenv("HOME"));
 		argv_ptr++;
 	}
 	strcat(dirbuf,argv_ptr);
@@ -84,7 +85,6 @@ int main(int argc,char *argv[]){
         printf("ERROR: Path exist error\n");
         exit(1);
     }
-	printf("%s\n",dirname);
 
     if(lstat(dirname,&statbuf)<0){
         fprintf(stderr,"lstat error for %s\n",dirname);
@@ -96,6 +96,13 @@ int main(int argc,char *argv[]){
         exit(1);
     }
 
+	if(getuid()==0){
+		strcpy(dirbuf,getenv("HOME"));
+		strcat(dirbuf,"/Trash");
+		if(access(dirbuf,F_OK)<0){
+			mkdir("/root/Trash",0776);
+		}
+	}
 	gettimeofday(&begin_t,NULL);
 	read_directory(dirname);
 	gettimeofday(&end_t,NULL);
@@ -131,6 +138,10 @@ int main(int argc,char *argv[]){
 		fgets(input,sizeof(input),stdin);
 		count=split(input," ",arr);
 
+		if(arr[0][0]=='\n'){
+			continue;
+		}
+
 		if(!strcmp(arr[0],"exit\n")){
 			printf("Back to Prompt\n");
 			exit(0);
@@ -161,6 +172,13 @@ int main(int argc,char *argv[]){
 			path_file_extract(path_file,idx,d_idx);
 			printf("\"%s\" has been deleted in #%d\n\n",path_file,idx);
 			Dpop(idx,d_idx);
+			print_dup(dirname);
+		}
+		//option p
+		else if(arr[1][0]=='p'){
+			path_file_extract(path_file,idx,d_idx);
+			printf("\"%s\" have moved to Trash in #%d\n\n",path_file,idx);
+			Dtrash(idx,d_idx);
 			print_dup(dirname);
 		}
 		//option i
@@ -194,7 +212,6 @@ int main(int argc,char *argv[]){
 		}
 		//option f와 option t
 		else if(arr[1][0]=='f'||arr[1][0]=='t'){
-//			left_list=(f_node **)malloc(sizeof(f_node *));
 			f_node *left;
 			struct stat t_statbuf;
 			long long max=0;
@@ -213,7 +230,6 @@ int main(int argc,char *argv[]){
 			}
 			max=I_time[1];
 			d_idx=1;
-//			qsort(I_time,sizeof(I_time)/sizeof(long long),sizeof(long long),time_compare);
 			for(i=1;i<=set_count[idx];i++){
 				if(I_time[i]>max){
 					max=I_time[i];
@@ -234,15 +250,12 @@ int main(int argc,char *argv[]){
 				printf("Left file in #%d : %s (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
 			}
 			else if(arr[1][0]=='t'){
-				printf("1\n");//debug
 				for(i=1;i<d_idx;i++){
-				printf("2\n");//debug
 					Dtrash(idx,i-temp);
 					temp++;
 				}
 				temp=0;
 				for(i=d_idx+1;i<=set_count[idx];i++){
-				printf("3\n");//debug
 					Dtrash(idx,2);
 					temp++;
 				}
@@ -253,6 +266,7 @@ int main(int argc,char *argv[]){
 		else
 			printf("Input Error\n");
 	}
+	minsize=maxsize=0;
 	exit(0);
 }
 
@@ -264,7 +278,10 @@ void read_directory(char *dirname){
 	lpath_queue q;
 	int depth=-1;
 	dirinfo root_dir;
+	char Trash[PATHMAX];
 
+	strcpy(Trash,getenv("HOME"));
+	strcat(Trash,"/.local/share/Trash/files");
 	strcpy(root_dir.path,dirname);
 	root_dir.depth=depth;
 
@@ -277,6 +294,7 @@ void read_directory(char *dirname){
 		Qpop(&q);
 		depth=f_dir.depth+1;
 		
+
 		if(access(f_dir.path,F_OK)!=0){
 			if(errno==13)
 				return;
@@ -318,10 +336,8 @@ void read_directory(char *dirname){
 			if(S_ISDIR(statbuf.st_mode)){
 				r_dir.depth=depth;
 				Qpush(&q,r_dir);
-//				printf("%d: %s\n",depth,r_dir.path);
 			}
 			else if(S_ISREG(statbuf.st_mode)){
-//				printf("dir: %s\n",namelist[i]->d_name);
 				//FILESIZE가 0이면 삭제
 				if(statbuf.st_size==0){
 					remove(r_dir.path);
@@ -351,13 +367,6 @@ void read_directory(char *dirname){
 				file.size=(long long)statbuf.st_size;
 				file.depth=depth;
 				fmd5(r_dir.path,file.md);
-				/*
-				//DEBUG
-				printf("%s/%s   %lld    %d   ",file.path,file.name,file.size,file.depth);
-				for(int i=0;i<MD5_DIGEST_LENGTH;i++)
-					printf("%02x",file.md[i]);
-				printf("\n");
-				*/
 				Dpush(file);
 			}
 		}
@@ -388,11 +397,6 @@ void fmd5(char *file_path,unsigned char *md){
     }
     MD5_Final(&(md[0]),&c);
 
-    /*
-    for(i=0;i<MD5_DIGEST_LENGTH;i++)
-        printf("%02x",md[i]);
-    printf("\n");
-    */
     fclose(IN);
 }
 
@@ -510,6 +514,9 @@ void Dpop(int idx,int s_idx){
 	char path_file[PATHMAX];
 
 	path_file_extract(path_file,idx,s_idx);
+	for(int i=1;i<s_idx;i++){
+		cur=cur->next;
+	}
 	pop=cur->next;
 	cur->next=pop->next;
 
@@ -529,13 +536,18 @@ void Dtrash(int idx,int s_idx){
 
 	path_file_extract(path_file,idx,s_idx);
 	file_extract(file,idx,s_idx);
+	for(i=1;i<s_idx;i++){
+		cur=cur->next;
+	}
     pop=cur->next;
     cur->next=pop->next;
-	printf("%s\n",path_file);
 
 	while(1){
-		home_dir(home_path);
-		sprintf(trash_file,"%s/.local/share/Trash/files/version%d%s",home_path,i,file);
+		strcpy(home_path,getenv("HOME"));
+		if(getuid()==0)
+			sprintf(trash_file,"%s/Trash/version%d%s",home_path,i,file);
+		else
+			sprintf(trash_file,"%s/.local/share/Trash/files/version%d%s",home_path,i,file);
 		i++;
 		if(access(trash_file,F_OK)==0)
 			continue;

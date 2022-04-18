@@ -23,6 +23,7 @@
 #define REGFILE 1
 #define DIRECTORY 2
 #define EXTENSIONMAX 7
+#define HASHMAX 200
 
 //BFS 디렉토리 정보
 typedef struct dirinfo{
@@ -36,7 +37,7 @@ typedef struct fileinfo{
 	char path[PATHMAX];
 	long long size;
 	int depth;
-	unsigned char md[MD5_DIGEST_LENGTH];
+	unsigned char md[HASHMAX];
 } fileinfo;
 
 //디렉토리정보 node
@@ -83,5 +84,5 @@ void print_size(long long size,char *p_size);
 char* get_time(time_t stime);
 void path_file_extract(char *f,int idx, int d_idx);
 long long Integer_time(time_t stime);
-void home_dir(char *);
+//void home_dir(char *);
 void file_extract(char *f,int idx,int d_idx);

@@ -67,8 +67,11 @@ long long unit_to_byte(char *argv){
 	}
 	else if(count==2){
 		length=strlen(arr[1]);
+		if(KMG-length<0)
+			length=KMG;
 		for(i=0;i<KMG-length;i++)
 			strcat(arr[1],"0");
+		arr[1][KMG]=0;
 		strcat(arr[0],arr[1]);
 	}
 	else 
@@ -129,31 +132,3 @@ long long Integer_time(time_t stime){
 	return atoll(time);
 }
 
-void home_dir(char *home){
-	struct passwd *pwd;
-	char buf[1024];
-	size_t bufsize;
-	int ret;
-	int uid=0;
-
-	if(getuid()==0){
-		setuid(1000);
-		uid++;
-	}
-	errno=0;
-
-	if((pwd=getpwuid(getuid()))==NULL){
-		if(errno==0||errno==ENOENT||errno==ESRCH||errno==EBADF||errno==EPERM){
-			printf("Error : getpwuid\n");
-			exit(1);
-		}
-		else{
-			printf("Error: %s\n",strerror(errno));
-			exit(1);
-		}
-	}
-	strcpy(home,pwd->pw_dir);
-	if(uid){
-		setuid(0);
-	}
-}

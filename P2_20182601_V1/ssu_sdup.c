@@ -5,8 +5,6 @@ int main(void){
     int argc=0;
     char input[BUFMAX];
     char *argv[ARGMAX+1];
-//	int status;
-
 
     //프롬프트 시작
     while(1) {
