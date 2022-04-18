@@ -53,6 +53,7 @@ typedef struct f_node{
 	struct f_node *next;
 } f_node;
 	
+//큐
 typedef struct lpath_queue{
 	d_node *front;
 	d_node *rear;
@@ -78,12 +79,10 @@ void Dpop(int idx,int s_idx);
 void Dtrash(int idx,int s_idx);
 int split(char *string, char *seperator, char *argv[]);
 long long unit_to_byte(char *argv);
-long long file_size(char *path);
 void Qsort(int start, int end);
 void print_dup(char *dirname);
 void print_size(long long size,char *p_size);
 char* get_time(time_t stime);
 void path_file_extract(char *f,int idx, int d_idx);
 long long Integer_time(time_t stime);
-//void home_dir(char *);
 void file_extract(char *f,int idx,int d_idx);

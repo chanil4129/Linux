@@ -35,13 +35,6 @@ long long unit_to_byte(char *argv){
     unit=unit_argv+i;
     //byte
     if((length-i)==0||!strcmp(unit,"BYTE")||!strcmp(unit,"byte")){
-		/*
-		unit_argv[i]=0;
-		if(!strcmp(unit_argv,"0")){
-			return 0;
-		}
-        return atoll(unit_argv)?atoll(unit_argv):-1;
-		*/
 		return atoll(unit_argv);
     }
     //kb,mb,gb
@@ -50,7 +43,6 @@ long long unit_to_byte(char *argv){
     else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) KMG=9;
 	else return-1;
 	unit_argv[i]='\0';
-//	unit='\0';
 
 	//"숫자"혹은"." 외에 들어오면 에러처리
     count=split(unit_argv,".",arr);
@@ -77,16 +69,6 @@ long long unit_to_byte(char *argv){
 	else 
 		return -1;
 
-	/*
-	for(i=0;i<strlen(arr[0]);i++){
-		if(arr[0][i]!='0')
-			break;
-		return 0;
-	}
-
-	return
-		atoll(arr[0])?atoll(arr[0]):-1;
-		*/
 	return atoll(arr[0]);
 }
 

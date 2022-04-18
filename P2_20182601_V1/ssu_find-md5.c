@@ -278,10 +278,10 @@ void read_directory(char *dirname){
 	lpath_queue q;
 	int depth=-1;
 	dirinfo root_dir;
-	char Trash[PATHMAX];
+//	char Trash[PATHMAX];
 
-	strcpy(Trash,getenv("HOME"));
-	strcat(Trash,"/.local/share/Trash/files");
+//	strcpy(Trash,getenv("HOME"));
+//	strcat(Trash,"/.local/share/Trash/files");
 	strcpy(root_dir.path,dirname);
 	root_dir.depth=depth;
 
@@ -508,6 +508,7 @@ void Dpush(fileinfo f){
 	}
 }
 
+//중복 리스트에서 삭제. 파일 삭제
 void Dpop(int idx,int s_idx){
 	f_node *cur=dup_list[idx];
 	f_node *pop;
@@ -524,6 +525,7 @@ void Dpop(int idx,int s_idx){
 	free(pop);
 }
 
+//중복 리스트에서 삭제. 파일 휴지통으로 옮기기
 void Dtrash(int idx,int s_idx){
 	f_node *cur=dup_list[idx];
     f_node *pop;
@@ -561,6 +563,7 @@ void Dtrash(int idx,int s_idx){
     free(pop);
 }
 
+//중복 리스트 파일 크기, 경로 깊이 순서대로 정렬
 void Qsort(int start, int end){
 	if(start>=end){
 		return;
@@ -596,6 +599,7 @@ void Qsort(int start, int end){
 	Qsort(j+1,end);
 }
 
+//중복 리스트 생성 및 추가. 완성된 중복 리스트 출력
 void print_dup(char *dirname){
 	char print_file_size[26];
 	int i=0;
@@ -652,6 +656,7 @@ void print_dup(char *dirname){
 	}
 }
 
+//중복 리스트를 탐색하여 경로와 파일 이름을 문자열에 저장
 void path_file_extract(char *f,int idx, int d_idx){
 	f_node *cur=dup_list[idx];
 	
@@ -666,6 +671,7 @@ void path_file_extract(char *f,int idx, int d_idx){
 	strcat(f,cur->data.name);
 }
 
+//중복 리스트를 탐색하여 파일 이름만 문자열에 저장
 void file_extract(char *f,int idx,int d_idx){
 	f_node *cur=dup_list[idx];
 	
