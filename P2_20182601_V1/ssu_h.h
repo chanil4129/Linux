@@ -12,6 +12,7 @@
 #include <pwd.h>
 #include <dirent.h>
 #include <openssl/md5.h>
+#include <openssl/sha.h>
 
 #define TRUE 1
 #define FALSE 0
