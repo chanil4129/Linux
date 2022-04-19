@@ -75,12 +75,15 @@ int main(int argc,char *argv[]){
 	//[TARGET_DIR]
 	dirbuf[0]=0;
 	argv_ptr=argv[4];
+
+	//~가 들어온다면
 	if(argv[4][0]=='~'){
 		strcpy(dirbuf,getenv("HOME"));
 		argv_ptr++;
 	}
 	strcat(dirbuf,argv_ptr);
 
+	//절대 경로로 바꿔주기
     if(realpath(dirbuf,dirname)==NULL){
         printf("ERROR: Path exist error\n");
         exit(1);
@@ -96,6 +99,7 @@ int main(int argc,char *argv[]){
         exit(1);
     }
 
+	//홈 디렉토리가 /root라면 /root/Trash 휴지통 디렉토리 만들기
 	if(getuid()==0){
 		strcpy(dirbuf,getenv("HOME"));
 		strcat(dirbuf,"/Trash");
@@ -103,6 +107,8 @@ int main(int argc,char *argv[]){
 			mkdir("/root/Trash",0776);
 		}
 	}
+
+	//BFS 탐색 및 시간 측정
 	gettimeofday(&begin_t,NULL);
 	read_directory(dirname);
 	gettimeofday(&end_t,NULL);
@@ -119,6 +125,7 @@ int main(int argc,char *argv[]){
 	print_dup(dirname);
 	printf("Seraching time: %ld:%06ld\n\n",end_t.tv_sec,end_t.tv_usec);
 
+	//옵션 명령어
 	while(1){
 		char path_file[PATHMAX];
 		char input[BUFMAX];
@@ -237,6 +244,7 @@ int main(int argc,char *argv[]){
 				}
 			}
 			path_file_extract(path_file,idx,d_idx);
+			//f
 			if(arr[1][0]=='f'){
 				for(i=1;i<d_idx;i++){
 					Dpop(idx,i-temp);
@@ -249,6 +257,7 @@ int main(int argc,char *argv[]){
 				}
 				printf("Left file in #%d : %s (%s)\n\n",idx,path_file,get_time(t_statbuf.st_mtime));
 			}
+			//t
 			else if(arr[1][0]=='t'){
 				for(i=1;i<d_idx;i++){
 					Dtrash(idx,i-temp);
@@ -278,10 +287,7 @@ void read_directory(char *dirname){
 	lpath_queue q;
 	int depth=-1;
 	dirinfo root_dir;
-//	char Trash[PATHMAX];
 
-//	strcpy(Trash,getenv("HOME"));
-//	strcat(Trash,"/.local/share/Trash/files");
 	strcpy(root_dir.path,dirname);
 	root_dir.depth=depth;
 
@@ -333,10 +339,12 @@ void read_directory(char *dirname){
                 exit(1);
             }
 
+			//디렉토리면 탐색
 			if(S_ISDIR(statbuf.st_mode)){
 				r_dir.depth=depth;
 				Qpush(&q,r_dir);
 			}
+			//정규파일이면 파일리스트에 넣기
 			else if(S_ISREG(statbuf.st_mode)){
 				//FILESIZE가 0이면 삭제
 				if(statbuf.st_size==0){
@@ -458,6 +466,7 @@ void Qpeek(path_queue pq,dirinfo *dir){
 	dir->depth=pq->front->data.depth;
 }
 
+//노드를 추가하여 정규파일의 정보를 저장하고 파일리스트에 추가
 void Dpush(fileinfo f){
 	f_node *newNode=(f_node *)malloc(sizeof(f_node));
 	newNode->next=NULL;
