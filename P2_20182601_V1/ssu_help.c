@@ -9,6 +9,7 @@ int main(void){
 	printf("         exit : goto main display\n");
     printf("         [OPTION ...]\n");
     printf("         d [LIST_IDX] : delete [LIST_IDX] file\n");
+    printf("         p [LIST_IDX] : move to Trash [LIST_IDX] file\n");
     printf("         i : ask for confirmation before delete\n");
     printf("         f : force delete except the recently modified file\n");
     printf("         t : force move to Trash except the recently modified file\n");
