@@ -21,73 +21,96 @@ long long unit_to_byte(char *argv){
     char *arr[20];
     int count;
     int i=0;
+	int KMG;//KB,MB,GB 구분
+	char *unit_argv=(char *)malloc(sizeof(argv));
+	strcpy(unit_argv,argv);
 
-    length=strlen(argv);
-    for(i=0;i<length;i++) if(argv[i]<'0'||argv[i]>'9'||argv[i]!='.') break;
+    length=strlen(unit_argv);
+    for(i=0;i<length;i++) {
+		if(unit_argv[i]>='0'&&unit_argv[i]<='9'||unit_argv[i]=='.') 
+			continue;
+		break;
+	}
 
-    unit=argv+i;
+    unit=unit_argv+i;
     //byte
     if((length-i)==0||!strcmp(unit,"BYTE")||!strcmp(unit,"byte")){
-        return atoll(argv);
+		return atoll(unit_argv);
     }
     //kb,mb,gb
-    count=split(argv,".",arr);
-    if(count!=1||count!=2){
-        return -1;
-    }
-    if(!strcmp(unit,"KB")||!strcmp(unit,"kb")) {
-        for(i=0;i<3;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][3]='\0';
-    }
-    else if(!strcmp(unit,"MB")||!strcmp(unit,"mb")) {
-        for(i=0;i<6;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][6]='\0';
-    }
-    else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) {
-        for(i=0;i<9;i++){
-            if(count==1)
-                arr[1][i]='0';
-        }
-        arr[1][9]='\0';
-    }
-    else
-        return -1;
-    strcat(arr[0],arr[1]);
-    return atoll(arr[0]);
+    if(!strcmp(unit,"KB")||!strcmp(unit,"kb")) KMG=3;
+    else if(!strcmp(unit,"MB")||!strcmp(unit,"mb")) KMG=6;
+    else if(!strcmp(unit,"GB")||!strcmp(unit,"gb")) KMG=9;
+	else return-1;
+	unit_argv[i]='\0';
+
+	//"숫자"혹은"." 외에 들어오면 에러처리
+    count=split(unit_argv,".",arr);
+	for(i=0;i<count;i++){
+		for(int j=0;j<strlen(arr[i]);j++){
+			if(arr[i][j]>='0'&&arr[i][j]<='9'||arr[i][j]=='.')
+				continue;
+			return -1;
+		}
+	}
+	if(count==1){
+		for(i=0;i<KMG;i++)
+			strcat(arr[0],"0");
+	}
+	else if(count==2){
+		length=strlen(arr[1]);
+		if(KMG-length<0)
+			length=KMG;
+		for(i=0;i<KMG-length;i++)
+			strcat(arr[1],"0");
+		arr[1][KMG]=0;
+		strcat(arr[0],arr[1]);
+	}
+	else 
+		return -1;
+
+	return atoll(arr[0]);
 }
 
-//파일 사이즈 추출
-long long file_size(char *fname){
-	FILE *fp;
-	char *buf;
-	long unit;
-	unsigned int total_size=0;
-	unsigned int current_size=0;
+//파일 사이즈 , 붙여서 나타내기
+void print_size(long long size,char *p_size){
+    char temp[26];
+    char *p;
+    int i;
 
-	if((fp=fopen(fname,"rb"))==NULL){
-		fprintf(stderr,"fopen error for %s\n",fname);
-		exit(1);
-	}
+    p=temp;
+    for(i=0;i<20&&size>0;i++){
+        if(i&&(i%3)==0)
+            *p++=',';
+        *p++=(size%10)+'0';
+        size/=10;
+    }
+    p--;
 
-	fseek(fp,0,SEEK_END);
-	unit=ftell(fp);
-	fseek(fp,0,SEEK_SET);
+    while(p>=temp)
+        *p_size++=*p--;
+    *p_size=0;
+}
 
-	buf=(char*)malloc(sizeof(char)*unit);
+//시간 출력
+char* get_time(time_t stime){
+    char *time=(char *)malloc(sizeof(char)*BUFMAX);
+    struct tm *tm;
 
-	while((current_size=fread(&buf[total_size],sizeof(char),unit-total_size,fp))>0){
-		total_size+=current_size;
-	}
+    tm=localtime(&stime);
+    sprintf(time,"%04d-%02d-%02d %02d:%02d:%02d",1900+tm->tm_year,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
 
-	if(total_size!=unit){
-		fprintf(stderr,"not read all file");
-		exit(1);
-	}
+    return time;
+}
+
+//최근 수정 시간 정수로 나타내기
+long long Integer_time(time_t stime){
+	char *time=(char *)malloc(sizeof(char)*BUFMAX);
+	struct tm *tm;
+	
+	tm=localtime(&stime);
+    sprintf(time,"%04d%02d%02d%02d%02d%02d",tm->tm_year,tm->tm_mon+1,tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+	
+	return atoll(time);
 }
 

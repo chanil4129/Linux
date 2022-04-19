@@ -26,7 +26,7 @@ void command_md5(char *file_path,unsigned char *md){
 	fd=fileno(IN);
 	MD5_Init(&c);
 	while(1){
-		i=read(fd,buf,BUFSIZE);
+		i=md5_read(fd,buf,BUFSIZE);
 		if(i<=0) break;
 		MD5_Update(&c,buf,(unsigned long)i);
 	}
