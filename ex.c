@@ -17,6 +17,8 @@ int main(void){
 	printf("%d\n",flag|=3);
 	printf("%d\n",flag&1);
 	printf("%d\n",flag&~1);
+	printf("%d\n",flag&~1);
+
 	flag=7;
 	printf("%d\n",flag^=2);
 }
