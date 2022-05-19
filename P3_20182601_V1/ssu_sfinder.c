@@ -17,7 +17,50 @@
 #define ARGMAX 11
 #define BUFMAX 1024
 #define FILEMAX 255
-#define PATHMAX BUFMAX*4
+#define PATHMAX 4096
+
+#define DIRECTORY 1
+#define REGFILE 2
+
+#define KB 1000
+#define MB 1000000
+#define GB 1000000000
+#define KiB 1024
+#define MiB 1048576
+#define GiB 1073741824
+#define SIZE_ERROR -2
+
+#ifdef HASH_SHA1
+	#define HASHMAX 41
+#else
+	#define HASHMAX 33
+#endif
+
+typedef struct fileInfo{
+	char path[PATHMAX];
+	struct stat statbuf;
+	struct fileInfo *next;
+} fileInfo;
+
+typedef struct fileList{
+	long long filesize;
+	char hash[HASHMAX];
+	fileInfo *fileInfoList;
+	struct fileList *next;
+} fileList;
+
+typedef struct dirList{
+	char dirpath[PATHMAX];
+	struct dirlist *next;
+} dirList;
+
+char extension[10];
+char same_size_files_dir[PATHMAX];
+char trash_path[PATHMAX];
+long long minbsize;
+long long maxbsize;
+fileList *dups_list_h;
+
 
 void command_fmd5(int argc,char *argv[]);
 void command_fsha1(int argc,char *argv[]);
@@ -75,7 +118,11 @@ void command_fmd5(int argc, char *argv[]){
 		return;
 	}
 
-	while((opt=getopt(argc,argv,"elhdt"))!=-1){
+	while((opt=getopt(argc,argv,"e:l:h:d:t:"))!=EOF){
+		printf("opt :%d\n",opt);
+		printf("operr : %d\n",opterr);
+		printf("optarg :%s\n",optarg);
+		printf("optind :%d\n",optind);
 		switch(opt){
 			case 'e':
 				flag_e=1;
@@ -97,10 +144,9 @@ void command_fmd5(int argc, char *argv[]){
 				return;
 		}
 	}
-
 	printf("%d\n%d\n%d\n%d\n%d\n",flag_e,flag_l,flag_h,flag_d,flag_t);
 
-//	flag_e=flag_l=flag_h=flag_d=flag_t=0;
+	optind=0;
 }
 
 void command_fsha1(int argc,char *argv[]){
