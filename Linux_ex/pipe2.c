@@ -25,6 +25,7 @@ int main(void) {
 		printf(" PARENT: writing to the pipe\n");
 		write(pipe_fd[1], "OSLAB", 6);
 		printf(" PARENT: waiting\n");
+		//쓰기 작업 후 자식 프로세스를 기다리고 자식프로세스가 작업을 마치면 같이 종료
 		wait(NULL);
 	} 
 	//자식 프로세스는 read를 담당

@@ -22,7 +22,6 @@ int main(void){
 	}
 	//자식 프로세스가 할 일
 	else if (pid == 0) {
-		//pipe 파일을 닫아서 두 프로세스 사이에 통신이 불가능함.
 		close(pipe_fd[0]);
 		while (1) {
 			memset(buf, 0x00, BUFFER_SIZE);
@@ -40,6 +39,7 @@ int main(void){
 			fprintf(stderr, "%s", buf);
 		}
 	}
+	//자식 프로세스는 쓰기만하고 부모프로세스는 읽기만 한다.
 
 	exit(0);
 }
