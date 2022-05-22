@@ -17,6 +17,7 @@ int main(void){
 	int fd;
 	int length;
 
+	//FIFO 파일 생성
 	mkfifo(FIFO_NAME,FILE_MODE);
 	printf("waiting for readers... \n");
 
@@ -27,6 +28,8 @@ int main(void){
 
 	printf("got a reader--type some stuff \n");
 
+	//stdin에 입력한걸 FIFO파일에 write한다.
+	//write한것을 송신
 	while(fgets(buf,BUFFER_SIZE,stdin),!feof(stdin)){
 		if((length=write(fd,buf,strlen(buf)-1))==-1){
 			fprintf(stderr,"write error\n");

@@ -15,6 +15,7 @@ int main(void){
 	int fd;
 	int length;
 
+	//FIFO 파일 생성
 	mknod(FIFO_NAME, S_IFIFO | 0666, 0);
 	printf("waiting for writers... \n");
 
@@ -25,6 +26,7 @@ int main(void){
 
 	printf("got a writer \n");
 
+	//FIFO 송신한걸 받아서 read하여 결과를 출력
 	do {
 		if((length=read(fd,buf,BUFFER_SIZE))==-1){
 			fprintf(stderr,"read error\n");
