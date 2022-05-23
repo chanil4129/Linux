@@ -12,7 +12,6 @@
 #include <pwd.h>
 #include <dirent.h>
 #include <openssl/md5.h>
-#include <openssl/sha.h>
 #include <limits.h>
 #include <ctype.h>
 #include <math.h>
@@ -24,7 +23,7 @@
 #define BUFMAX 1024
 #define FILEMAX 255
 #define PATHMAX 4096
-#define THREADMAX 5
+#define THREADMAX 4
 
 #define DIRECTORY 1
 #define REGFILE 2
@@ -37,11 +36,7 @@
 #define GiB 1073741824
 #define SIZE_ERROR -2
 
-#ifdef HASH_SHA1
-	#define HASHMAX 41
-#else
-	#define HASHMAX 33
-#endif
+#define HASHMAX 33
 
 typedef struct fileInfo {
 	char path[PATHMAX];
@@ -62,6 +57,7 @@ typedef struct dirList {
 } dirList;
 
 typedef struct thread_data{
+	char *hash;
 	char *filename;
 	char *fullpath;
 } thread_data;
@@ -69,21 +65,24 @@ typedef struct thread_data{
 char extension[10];
 char same_size_files_dir[PATHMAX];
 char trash_path[PATHMAX];
+char trash_path_info[PATHMAX];
+char log_path[PATHMAX];
 long long minbsize;
 long long maxbsize;
 fileList *dups_list_h;
 thread_data thread_data_array[THREADMAX];
-//pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 int thread_num;
 int work_thread;
+pthread_t tid[THREADMAX];
+int t;
 
-void command_fmd5(int argc,char *argv[]);
-void command_fsha1(int argc,char *argv[]);
-void command_list(int argc,char *argv[]);
-void command_trash(int argc,char *argv[]);
-void command_restore(int argc,char *argv[]);
-void command_help(void);
-void fileinfo_append(fileInfo *head, char *path);
+void command_fmd5(int argc,char *argv[]);//fmd5 명령어
+void command_list(int argc,char *argv[]);//list 명령어
+void command_trash(int argc,char *argv[]);//trash 명령어
+void command_restore(int argc,char *argv[]);//restore 명령어
+void command_help(void);//help 명령어
+void fileinfo_append(fileInfo *head, char *path);//파일 정보 추가
 fileInfo *fileinfo_delete_node(fileInfo *head, char *path);
 int fileinfolist_size(fileInfo *head);//해당 리스트 개수 세주는거
 void filelist_append(fileList *head, long long filesize, char *path, char *hash);
@@ -93,23 +92,23 @@ int filelist_search(fileList *head, char *hash);
 void dirlist_append(dirList *head, char *path);
 void dirlist_print(dirList *head, int index);
 void dirlist_delete_all(dirList *head);
-void get_path_from_home(char *path, char *path_from_home);
-int is_dir(char *target_dir);
-long long get_size(char *filesize);
-int get_file_mode(char *target_file, struct stat *statbuf);
+void get_path_from_home(char *path, char *path_from_home);//'~' 절대경로 찾아주기
+int is_dir(char *target_dir);//디렉토리인지
+long long get_size(char *filesize);//파일 사이즈 얻기
+int get_file_mode(char *target_file, struct stat *statbuf);//디렉토리 정규파일 구분
 void get_fullpath(char *target_dir, char *target_file, char *fullpath);//path+filename
 int get_dirlist(char *target_dir, struct dirent ***namelist);//하위 디렉토리 확인
 char *get_extension(char *filename);//확장자 뒷부분 포인터 or NULL
 void get_filename(char *path, char *filename);//파일이름만(.이랑 / 다 빼고)
-void get_new_file_name(char *org_filename, char *new_filename);//버전 높여가면서 새로운 이름짓기(휴지통 관련인듯).
+void get_new_file_name(char *org_filename, char *new_filename);//버전 높여가면서 새로운 이름짓기(휴지통 관련)
 void remove_files(char *dir);//파일 삭제
-void get_same_size_files_dir(void);
-void get_trash_path(void);
+void get_same_size_files_dir(void);//중복파일 기록
+void get_trash_path(void);//휴지통 경로 얻기
+void get_log_path(void);//로그파일 경로 얻기
 void filesize_with_comma(long long filesize, char *filesize_w_comma);//파일 사이즈에 3자리마다 콤마넣기
 void sec_to_ymdt(struct tm *time, char *ymdt);//시간 출력
 void filelist_print_format(fileList *head);
 int md5(char *target_path, char *hash_result);
-int sha1(char *target_path, char *hash_result);
 void hash_func(char *path, char *hash);
 void dir_traverse(dirList *dirlist);
 void *regfile_thread(void *arg);
@@ -136,9 +135,6 @@ int main(void){
 
 		if(!strcmp(argv[0], "fmd5"))
 			command_fmd5(argc,argv);
-
-		else if(!strcmp(argv[0],"fsha1"))
-			command_fsha1(argc,argv);
 
 		else if(!strcmp(argv[0],"list"))
 			command_list(argc,argv);
@@ -208,7 +204,7 @@ void command_fmd5(int argc, char *argv[]){
 	if(flag_t==0){
 		t_argv="1";
 	}
-	thread_num=atoi(t_argv);
+	thread_num=atoi(t_argv)-1;
 	
 	if(strchr(e_argv,'*')==NULL){
 		printf("ERROR: [FILE_EXTENSION] should be '*' or '*.extension'\n");
@@ -297,12 +293,11 @@ void command_fmd5(int argc, char *argv[]){
 	printf("Searching time: %ld:%06ld(sec:usec)\n\n", end_t.tv_sec, end_t.tv_usec);
 
 	get_trash_path();
+	get_log_path();
 
 	delete_prompt();
 }
 
-void command_fsha1(int argc,char *argv[]){
-}
 void command_list(int argc,char *argv[]){
 }
 void command_trash(int argc,char *argv[]){
@@ -636,16 +631,41 @@ void get_same_size_files_dir(void){
 
 void get_trash_path(void){
 	if (getuid() == 0){
-		get_path_from_home("~/Trash/", trash_path);
+		get_path_from_home("~/.Trash/files/", trash_path);
+		get_path_from_home("~/.Trash/info/", trash_path_info);
 
 		if (access(trash_path, F_OK) == 0)
 			remove_files(trash_path);
 		else
 			mkdir(trash_path, 0755);
+
+		if (access(trash_path_info,F_OK)==0)
+			remove_files(trash_path_info);
+		else
+			mkdir(trash_path_info,0755);
 	}
-	else
+	else{
 		get_path_from_home("~/.local/share/Trash/files/", trash_path);
+		get_path_from_home("~/.local/share/Trash/info/", trash_path_info);
+	}
 }
+
+//log파일 위치
+void get_log_path(void){
+	if (getuid() == 0){
+		get_path_from_home("~/.duplicate_20182601.log", log_path);
+
+		if (access(log_path, F_OK) != 0)
+			creat(log_path,0666);
+	}
+	else{
+		get_path_from_home("~/.duplicate_20182601.log", log_path);
+
+		if (access(log_path, F_OK) != 0)
+			creat(log_path,0666);
+	}
+}
+	
 
 void filesize_with_comma(long long filesize, char *filesize_w_comma){
 	char filesize_wo_comma[STRMAX] = {0, };
@@ -729,55 +749,20 @@ int md5(char *target_path, char *hash_result){
 	return 0;
 }
 
-int sha1(char *target_path, char *hash_result){
-	FILE *fp;
-	unsigned char hash[SHA_DIGEST_LENGTH];
-	unsigned char buffer[SHRT_MAX];
-	int bytes = 0;
-	SHA_CTX sha1;
-
-	if ((fp = fopen(target_path, "rb")) == NULL){
-		printf("ERROR: fopen error for %s\n", target_path);
-		return 1;
-	}
-
-	SHA1_Init(&sha1);
-
-	while ((bytes = fread(buffer, 1, SHRT_MAX, fp)) != 0)
-		SHA1_Update(&sha1, buffer, bytes);
-
-	SHA1_Final(hash, &sha1);
-
-	for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
-		sprintf(hash_result + (i * 2), "%02x", hash[i]);
-	hash_result[HASHMAX-1] = 0;
-
-	fclose(fp);
-
-	return 0;
-}
-
 void hash_func(char *path, char *hash){
-#ifdef HASH_SHA1
-	sha1(path, hash);
-#else
 	md5(path, hash);
-#endif
 }
 
 void dir_traverse(dirList *dirlist){
 	dirList *cur = dirlist->next;
 	dirList *subdirs = (dirList *)malloc(sizeof(dirList));
-	pthread_t tid[THREADMAX];
 	int status;
-	int t=0;
+	t=0;
 
-	printf("1\n");
 	for(int i=0;i<THREADMAX;i++)
 		memset(&thread_data_array[i],0,sizeof(thread_data));
 	memset(subdirs, 0 , sizeof(dirList));
 
-	printf("2\n");
 	while (cur != NULL){//while문이 왜 있는지 궁금...
 		struct dirent **namelist;
 		int listcnt;
@@ -791,7 +776,6 @@ void dir_traverse(dirList *dirlist){
 			int file_mode;
 			long long filesize;
 
-	printf("3\n");
 			if (!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, ".."))
 				continue;
 
@@ -812,7 +796,6 @@ void dir_traverse(dirList *dirlist){
 				continue;
 
 
-	printf("4\n");
 			if (file_mode == DIRECTORY)
 				dirlist_append(subdirs, fullpath);
 			else if (file_mode == REGFILE){
@@ -821,54 +804,82 @@ void dir_traverse(dirList *dirlist){
 				char *path_extension;
 				char hash[HASHMAX];
 
+				
 				thread_data_array[t].filename=filename;
 				thread_data_array[t].fullpath=fullpath;
 				sprintf(filename, "%s/%lld", same_size_files_dir, filesize);
 
+				
+				memset(hash, 0, HASHMAX);
+				hash_func(fullpath, hash);//해쉬 얻기
+				thread_data_array[t].hash=hash;
+
 				path_extension = get_extension(fullpath);
 
-	printf("5\n");
+				
 				if (strlen(extension) != 0){
 					if (path_extension == NULL || strcmp(extension, path_extension))
 						continue;
 				}
 
 				if(t<thread_num){
+					printf("t:%d\n",t);
 					if(pthread_create(&tid[t],NULL,regfile_thread,(void *)&thread_data_array[t])!=0){
 						fprintf(stderr,"pthread_create error\n");
 						exit(1);
 					}
+					printf("%s\n",filename);
+					printf("tid:%u\n",(unsigned int)tid[t]);
 					t++;
 				}
 				else{
+				//	pthread_mutex_lock(&mutex);
 					if ((fp = fopen(filename, "a")) == NULL){
 						printf("ERROR: fopen error for %s\n", filename);
 						return;
 					}
 
-					printf("6\n");
-					memset(hash, 0, HASHMAX);
-					hash_func(fullpath, hash);//해쉬 얻기
 					fprintf(fp, "%s %s\n", hash, fullpath);
 
 					fclose(fp);
+				//	pthread_mutex_unlock(&mutex);
+				}
+
+				//지정한 개수만큼의 thread 기다리기
+				if(t==thread_num){
+					for(t=0;t<thread_num;t++){
+						printf("join t : %d\n",t);
+					//	printf("thread t: %u\n",(unsigned int)tid[t]);
+						if(pthread_join(tid[t],(void *)&status)!=0){
+							fprintf(stderr,"pthread_join error\n");
+							return;
+						}
+					}
+					for(int i=0;i<THREADMAX;i++)
+						memset(&thread_data_array[i],0,sizeof(thread_data));
+					t=0;
+				}
+				
+			}
+		}
+
+		if(t>0){
+			for(int j=0;j<t;j++){
+				if(pthread_join(tid[j],(void *)&status)!=0){
+					fprintf(stderr,"pthread_join error\n");
+					return;
 				}
 			}
+			for(int i=0;i<THREADMAX;i++)
+				memset(&thread_data_array[i],0,sizeof(thread_data));
+			t=0;
 		}
 
 		cur = cur->next;
 	}
-	printf("7\n");
 
 	dirlist_delete_all(dirlist);
 
-	for(int t=0;t<thread_num;t++){
-		if(pthread_join(tid[t],(void *)&status)!=0){
-			fprintf(stderr,"pthread_join error\n");
-			return;
-		}
-	}
-	printf("8\n");
 	if (subdirs->next != NULL)
 		dir_traverse(subdirs);
 }
@@ -877,20 +888,25 @@ void *regfile_thread(void *arg){
 	FILE *fp;
 	char *filename;
 	char *fullpath;
-	char hash[HASHMAX];
+	char *hash;
 	thread_data *data;
 
+//	pthread_mutex_lock(&mutex);
 	data=(thread_data *)arg;
 	filename=data->filename;
 	fullpath=data->fullpath;
+	hash=data->hash;
+	printf("thread :%s\n",filename);
+	if(hash==NULL)exit(1);
 	if ((fp = fopen(filename, "a")) == NULL){
 		printf("ERROR: fopen error for %s\n", filename);
-		//return;
+	//	return;
 	}
-	memset(hash, 0, HASHMAX);
-	hash_func(fullpath,hash);
-	fprintf(fp,"%s %s\n",hash,fullpath);
+
+	fprintf(fp, "%s %s\n", hash, fullpath);
+
 	fclose(fp);
+//	pthread_mutex_unlock(&mutex);
 }
 
 void find_duplicates(void){
@@ -976,6 +992,9 @@ time_t get_recent_mtime(fileInfo *head, char *last_filepath){
 //삭제 옵션 명령하는 프롬프트
 void delete_prompt(void){
 	while (filelist_size(dups_list_h) > 0){
+		int flag_l=0,flag_d=0,flag_i=0,flag_f=0,flag_t=0;
+		char *l_argv,*d_argv;
+		int opt;
 		char input[STRMAX];
 		char last_filepath[PATHMAX];
 		char modifiedtime[STRMAX];
@@ -986,6 +1005,7 @@ void delete_prompt(void){
 		fileList *target_filelist_p;
 		fileInfo *target_infolist_p;
 
+		optind=0;
 		printf(">> ");
 
 		fgets(input, sizeof(input), stdin);
@@ -999,24 +1019,57 @@ void delete_prompt(void){
 
 		argc = split(input," ",argv);
 
-		if (argc < 2 || argc > 3){
-			printf("ERROR: >> [SET_INDEX] [OPTION]\n");
+		if(argc>5||argc<4){
+			printf("usage: delete -l [SET_IDX] -d [LIST_IDX]\n");
+			printf("usage: delete -l [SET_IDX] -i\n");
+			printf("usage: delete -l [SET_IDX] -f\n");
+			printf("usage: delete -l [SET_IDX] -t\n");
 			continue;
 		}
 
-		if (!atoi(argv[0])){
+		while((opt=getopt(argc,argv,"l:d:ift"))!=EOF){
+			switch(opt){
+				case 'l':
+					flag_l=1;
+					l_argv=optarg;
+					break;
+				case 'd':
+					flag_d=1;
+					d_argv=optarg;
+					break;
+				case 'i':
+					flag_i=1;
+					break;
+				case 'f':
+					flag_f=1;
+					break;
+				case 't':
+					flag_t=1;
+					break;
+				case '?':
+					printf("Unknown option : %c\n",optopt);
+					continue;
+			}
+		}
+
+		if(flag_l==0){
+			printf("option error: must be included '-l'\n");
+			continue;
+		}
+
+		if (!atoi(l_argv)){
 			printf("ERROR: [SET_INDEX] should be a number\n");
 			continue;
 		}
 
-		if (atoi(argv[0]) < 0 || atoi(argv[0]) > filelist_size(dups_list_h)){
+		if (atoi(l_argv) < 0 || atoi(l_argv) > filelist_size(dups_list_h)){
 			printf("ERROR: [SET_INDEX] out of range\n");
 			continue;
 		}
 
 		target_filelist_p = dups_list_h->next;
 
-		set_idx = atoi(argv[0]);
+		set_idx = atoi(l_argv);
 
 		while (--set_idx)
 			target_filelist_p = target_filelist_p->next;
@@ -1026,9 +1079,9 @@ void delete_prompt(void){
 		mtime = get_recent_mtime(target_infolist_p, last_filepath);
 		sec_to_ymdt(localtime(&mtime), modifiedtime);
 
-		set_idx = atoi(argv[0]);
+		set_idx = atoi(l_argv);
 
-		if (!strcmp(argv[1],"f")){
+		if (flag_f==1){
 			fileInfo *tmp;
 			fileInfo *deleted = target_infolist_p->next;
 
@@ -1045,9 +1098,9 @@ void delete_prompt(void){
 			}
 
 			filelist_delete_node(dups_list_h, target_filelist_p->hash);
-			printf("Left file in #%d : %s (%s)\n\n", atoi(argv[0]), last_filepath, modifiedtime);
+			printf("Left file in #%d : %s (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
-		else if(!strcmp(argv[1],"t")){
+		else if(flag_t==1){
 			fileInfo *tmp;
 			fileInfo *deleted = target_infolist_p->next;
 			char move_to_trash[PATHMAX];
@@ -1084,9 +1137,9 @@ void delete_prompt(void){
 			}
 
 			filelist_delete_node(dups_list_h, target_filelist_p->hash);
-			printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", atoi(argv[0]), last_filepath, modifiedtime);
+			printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
-		else if(!strcmp(argv[1],"i")){
+		else if(flag_i==1){
 			char ans[STRMAX];
 			fileInfo *fileinfo_cur = target_infolist_p->next;
 			fileInfo *deleted_list = (fileInfo *)malloc(sizeof(fileInfo));
@@ -1116,11 +1169,11 @@ void delete_prompt(void){
 				filelist_delete_node(dups_list_h, target_filelist_p->hash);
 
 		}
-		else if(!strcmp(argv[1], "d")){
+		else if(flag_d==1){
 			fileInfo *deleted;
 			int list_idx;
 
-			if (argv[2] == NULL || (list_idx = atoi(argv[2])) == 0){
+			if (d_argv == NULL || (list_idx = atoi(d_argv)) == 0){
 				printf("ERROR: There should be an index\n");
 				continue;
 			}
@@ -1135,7 +1188,7 @@ void delete_prompt(void){
 			while (list_idx--)
 				deleted = deleted->next;
 
-			printf("\"%s\" has been deleted in #%d\n\n", deleted->path, atoi(argv[0]));
+			printf("\"%s\" has been deleted in #%d\n\n", deleted->path, atoi(l_argv));
 			remove(deleted->path);
 			fileinfo_delete_node(target_infolist_p, deleted->path);
 
@@ -1212,7 +1265,7 @@ int split(char *string, char *seperator, char *argv[]){
 
 //help
 void command_help(void){
-	printf("Usage:\n > fmd5/fsha1 -e [FILE_EXTENSION] -l [MINSIZE] -h [MAXSIZE] -d [TARGET_DIRECTORY] -t [THREAD_NUM]\n");
+	printf("Usage:\n > fmd5 -e [FILE_EXTENSION] -l [MINSIZE] -h [MAXSIZE] -d [TARGET_DIRECTORY] -t [THREAD_NUM]\n");
 	printf("      >> delete -l [SET_INDEX] -d [OPTARG] -i -f -t\n");
 	printf(" > trash -c [CATEGORY] -o [ORDER]\n");
 	printf(" > restore [RESTORE_INDEX]\n");
