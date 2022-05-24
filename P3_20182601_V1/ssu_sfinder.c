@@ -74,6 +74,7 @@ char log_path[PATHMAX];
 long long minbsize;
 long long maxbsize;
 fileList *dups_list_h;
+fileList *dups_list_l;
 thread_data thread_data_array[THREADMAX];
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 int thread_num;
@@ -81,8 +82,13 @@ int work_thread;
 pthread_t tid[THREADMAX];
 int t;
 
+void fileinfolist_free(fileInfo *head);
+void dupslist_free(void);
 void command_fmd5(int argc,char *argv[]);//fmd5 명령어
 void command_list(int argc,char *argv[]);//list 명령어
+void set_swap(fileList *a,fileList *b);
+void list_swap(fileInfo *a,fileInfo *b);
+void list_init(char *l_argv,char *c_argv,char *o_argv);
 void command_trash(int argc,char *argv[]);//trash 명령어
 void command_restore(int argc,char *argv[]);//restore 명령어
 void command_help(void);//help 명령어
@@ -159,6 +165,31 @@ int main(void){
 	exit(0);
 }
 
+void dupslist_free(void){
+	fileList *filelist_cur=dups_list_h->next;
+	fileList *tmp;
+
+	while(filelist_cur!=NULL){
+		tmp=filelist_cur->next;
+		fileinfolist_free(filelist_cur->fileInfoList);
+		free(filelist_cur);
+		filelist_cur=tmp;
+	}
+	dups_list_h->next=NULL;
+}
+
+void fileinfolist_free(fileInfo *head){
+	fileInfo *fileinfo_cur = head->next;
+	fileInfo *tmp;
+
+	while(fileinfo_cur!=NULL){
+		tmp=fileinfo_cur->next;
+		free(fileinfo_cur);
+		fileinfo_cur=tmp;
+	}
+	head->next=NULL;
+}
+
 void command_fmd5(int argc, char *argv[]){
 	int flag_e=0,flag_l=0,flag_h=0,flag_d=0,flag_t=0;
 	int opt;
@@ -166,10 +197,19 @@ void command_fmd5(int argc, char *argv[]){
 	char target_dir[PATHMAX];
 	dirList *dirlist=(dirList *)malloc(sizeof(dirList));
 
+	dirlist->next=NULL;
+	if(dups_list_h!=NULL){
+		dupslist_free();
+		free(dups_list_h);
+	}
+
 	dups_list_h=(fileList *)malloc(sizeof(fileList));
-	
-	if(argc>11)
+	dups_list_h->next=NULL;
+
+	if(argc>11){
 		printf("Usage: find -e [FILE_EXTENSION] -l [MINSIZE] -h [MAXSIZE] -d [DIRECTORY] -t [THREAD NUM]\n");
+		return;
+	}
 
 	optind=0;
 	while((opt=getopt(argc,argv,"e:l:h:d:t:"))!=EOF){
@@ -274,6 +314,7 @@ void command_fmd5(int argc, char *argv[]){
 
 	dirlist_append(dirlist,target_dir);
 	dir_traverse(dirlist);
+	free(dirlist);
 	find_duplicates();
 	remove_no_duplicates();
 
@@ -303,7 +344,147 @@ void command_fmd5(int argc, char *argv[]){
 }
 
 void command_list(int argc,char *argv[]){
+	int flag_l=0,flag_c=0,flag_o=0;
+	int opt;
+	char *l_argv,*c_argv,*o_argv;
+
+	if(argc>7){
+		printf("usage: list -l [LIST_TYPE] -c [CATEGORY] -o [ORDER]\n");
+		return;
+	}
+
+	optind=0;
+	while((opt=getopt(argc,argv,"l:c:o:"))!=EOF){
+		switch(opt){
+			case 'l':
+				flag_l=1;
+				l_argv=optarg;
+				break;
+			case 'c':
+				flag_c=1;
+				c_argv=optarg;
+				break;
+			case 'o':
+				flag_o=1;
+				o_argv=optarg;
+				break;
+			case '?':
+				printf("Unknown option : %c\n",optopt);
+				return;
+		}
+	}
+
+	if(flag_l==0)
+		l_argv="fileset";
+	if(flag_c==0)
+		c_argv="size";
+	if(flag_o==0)
+		o_argv="1";
+
+	if(strcmp(l_argv,"fileset")&&strcmp(l_argv,"filelist")){
+		printf("'-l' option error\n");
+		return;
+	}
+
+	if(strcmp(c_argv,"size")&&strcmp(c_argv,"filename")&&strcmp(c_argv,"uid")&&strcmp(c_argv,"gid")&&strcmp(c_argv,"mode")){
+		printf("'-c' option error\n");
+		return;
+	}
+
+	if(strcmp(o_argv,"1")&&strcmp(o_argv,"-1")){
+		printf("'-o' option error\n");
+		return;
+	}
+
+	fileList *filelist=dups_list_h;
+	int compare;
+	if(!strcmp(l_argv,"fileset")){
+		for(int i=0;i<filelist_size(filelist);i++){
+			fileList *filelist_pre=filelist->next;
+			fileList *filelist_pst=filelist_pre->next;
+			for(int j=0;j<filelist_size(filelist)-(i+1);j++){
+				if(!strcmp(c_argv,"size"))
+					compare=filelist_pre->filesize<filelist_pst->filesize;
+
+				if(!strcmp(o_argv,"1")&&!compare)
+					set_swap(filelist_pre,filelist_pst);
+				else if(!strcmp(o_argv,"-1")&&compare)
+					set_swap(filelist_pre,filelist_pst);
+
+				filelist_pre=filelist_pre->next;
+				filelist_pst=filelist_pst->next;
+			}
+		}
+	}
+	else{
+		fileList *filelist_cur=filelist->next;
+		for(int k=0;k<filelist_size(filelist);k++){
+			for(int i=0;i<fileinfolist_size(filelist_cur->fileInfoList);i++){
+				fileInfo *fileinfo_pre=filelist_cur->fileInfoList->next;
+				fileInfo *fileinfo_pst=fileinfo_pre->next;
+				for(int j=0;j<fileinfolist_size(filelist_cur->fileInfoList)-(i+1);j++){
+					if(!strcmp(c_argv,"filename")){
+						compare=strcmp(fileinfo_pre->path,fileinfo_pst->path);
+						if(compare<=0)
+							compare=1;
+						else
+							compare=0;
+					}
+					if(!strcmp(c_argv,"uid"))
+						compare=fileinfo_pre->statbuf.st_uid<fileinfo_pst->statbuf.st_uid;
+					if(!strcmp(c_argv,"gid"))
+						compare=fileinfo_pre->statbuf.st_gid<fileinfo_pst->statbuf.st_gid;
+					if(!strcmp(c_argv,"mode"))
+						compare=fileinfo_pre->statbuf.st_mode<fileinfo_pst->statbuf.st_mode;
+
+
+					if(!strcmp(o_argv,"1")&&!compare)
+						list_swap(fileinfo_pre,fileinfo_pst);
+					else if(!strcmp(o_argv,"-1")&&compare)
+						list_swap(fileinfo_pre,fileinfo_pst);
+
+					fileinfo_pre=fileinfo_pre->next;
+					fileinfo_pst=fileinfo_pst->next;
+				}
+			}
+			filelist_cur=filelist_cur->next;
+		}
+	}
+
+	filelist_print_format(dups_list_h);
 }
+
+void set_swap(fileList *a,fileList *b){
+	long long filesize;
+	char hash[HASHMAX];
+	fileInfo *fileInfoList;
+	
+	filesize=a->filesize;
+	a->filesize=b->filesize;
+	b->filesize=filesize;
+
+	strcpy(hash,a->hash);
+	strcpy(a->hash,b->hash);
+	strcpy(b->hash,hash);
+
+	fileInfoList=a->fileInfoList;
+	a->fileInfoList=b->fileInfoList;
+	b->fileInfoList=fileInfoList;
+}
+
+void list_swap(fileInfo *a,fileInfo *b){
+	char path[PATHMAX];
+	struct stat statbuf;
+
+	strcpy(path,a->path);
+	strcpy(a->path,b->path);
+	strcpy(b->path,path);
+
+	statbuf=a->statbuf;
+	a->statbuf=b->statbuf;
+	b->statbuf=statbuf;
+}
+
 void command_trash(int argc,char *argv[]){
 }
 void command_restore(int argc,char *argv[]){
@@ -699,6 +880,12 @@ void filelist_print_format(fileList *head){
 
 	while (filelist_cur != NULL){
 		fileInfo *fileinfolist_cur = filelist_cur->fileInfoList->next;
+
+		if(fileinfolist_cur->next==NULL){
+			filelist_cur=filelist_cur->next;
+			continue;
+		}
+
 		char mtime[STRMAX];
 		char atime[STRMAX];
 		char filesize_w_comma[STRMAX] = {0, };
@@ -804,15 +991,10 @@ void dir_traverse(dirList *dirlist){
 				char *path_extension;
 				char hash[HASHMAX];
 
-				
-				thread_data_array[t].filename=filename;
-				thread_data_array[t].fullpath=fullpath;
 				sprintf(filename, "%s/%lld", same_size_files_dir, filesize);
 
-				
 				memset(hash, 0, HASHMAX);
 				md5(fullpath, hash);//해쉬 얻기
-				thread_data_array[t].hash=hash;
 
 				path_extension = get_extension(fullpath);
 
@@ -822,67 +1004,31 @@ void dir_traverse(dirList *dirlist){
 						continue;
 				}
 
-				if(t<thread_num){
-					printf("t:%d\n",t);
-					if(pthread_create(&tid[t],NULL,regfile_thread,(void *)&thread_data_array[t])!=0){
-						fprintf(stderr,"pthread_create error\n");
-						exit(1);
-					}
-					printf("%s\n",filename);
-					printf("tid:%u\n",(unsigned int)tid[t]);
-					t++;
-				}
-				else{
-				//	pthread_mutex_lock(&mutex);
-					if ((fp = fopen(filename, "a")) == NULL){
-						printf("ERROR: fopen error for %s\n", filename);
-						return;
-					}
-
-					fprintf(fp, "%s %s\n", hash, fullpath);
-
-					fclose(fp);
-				//	pthread_mutex_unlock(&mutex);
-				}
-
-				//지정한 개수만큼의 thread 기다리기
-				if(t==thread_num){
-					for(t=0;t<thread_num;t++){
-						printf("join t : %d\n",t);
-					//	printf("thread t: %u\n",(unsigned int)tid[t]);
-						if(pthread_join(tid[t],(void *)&status)!=0){
-							fprintf(stderr,"pthread_join error\n");
-							return;
-						}
-					}
-					for(int i=0;i<THREADMAX;i++)
-						memset(&thread_data_array[i],0,sizeof(thread_data));
-					t=0;
-				}
-				
-			}
-		}
-
-		if(t>0){
-			for(int j=0;j<t;j++){
-				if(pthread_join(tid[j],(void *)&status)!=0){
-					fprintf(stderr,"pthread_join error\n");
+				if ((fp = fopen(filename, "a")) == NULL){
+					printf("ERROR: fopen error for %s\n", filename);
 					return;
 				}
-			}
-			for(int i=0;i<THREADMAX;i++)
-				memset(&thread_data_array[i],0,sizeof(thread_data));
-			t=0;
-		}
 
+				fprintf(fp, "%s %s\n", hash, fullpath);
+
+				fclose(fp);
+
+			}
+		}
 		cur = cur->next;
 	}
 
 	dirlist_delete_all(dirlist);
 
-	if (subdirs->next != NULL)
-		dir_traverse(subdirs);
+	dirlist->next=subdirs->next;
+	free(subdirs);
+	if (dirlist->next != NULL)
+		dir_traverse(dirlist);
+	
+
 }
+
+
 
 void *regfile_thread(void *arg){
 	FILE *fp;
@@ -1009,8 +1155,9 @@ void delete_prompt(void){
 		printf(">> ");
 
 		fgets(input, sizeof(input), stdin);
+		input[strlen(input)-1]='\0';
 
-		if (!strcmp(input, "exit\n")){
+		if (!strcmp(input, "exit")){
 			printf(">> Back to Prompt\n");
 			break;
 		}
@@ -1152,13 +1299,13 @@ void delete_prompt(void){
 				sec_to_ymdt(localtime(&curTime),now);
 
 				fprintf(fp,"%s %lld %s",deleted->path,filesize,now);
+				fileinfo_delete_node(target_filelist_p->fileInfoList,deleted->path);
 
 				free(deleted);
 				deleted = tmp;
 				fclose(fp);
 			}
 
-			filelist_delete_node(dups_list_h, target_filelist_p->hash);
 			printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
 		else if(flag_i==1){
