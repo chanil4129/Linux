@@ -28,6 +28,10 @@
 #define DIRECTORY 1
 #define REGFILE 2
 
+#define REMOVE 1
+#define DELETE 2
+#define RESTORE 3
+
 #define KB 1000
 #define MB 1000000
 #define GB 1000000000
@@ -107,17 +111,17 @@ void get_trash_path(void);//휴지통 경로 얻기
 void get_log_path(void);//로그파일 경로 얻기
 void filesize_with_comma(long long filesize, char *filesize_w_comma);//파일 사이즈에 3자리마다 콤마넣기
 void sec_to_ymdt(struct tm *time, char *ymdt);//시간 출력
-void filelist_print_format(fileList *head);
-int md5(char *target_path, char *hash_result);
-void hash_func(char *path, char *hash);
-void dir_traverse(dirList *dirlist);
+void filelist_print_format(fileList *head);//중복리스트 출력
+int md5(char *target_path, char *hash_result);//md5 해시값 얻기
+void dir_traverse(dirList *dirlist);//BFS 재귀 탐색
 void *regfile_thread(void *arg);
-void find_duplicates(void);
+void find_duplicates(void);//중복 찾기
+void remove_no_duplicates(void);//중복 아닌거 삭제
 void remove_no_duplicates(void);
-void remove_no_duplicates(void);
-time_t get_recent_mtime(fileInfo *head, char *last_filepath);
-void delete_prompt(void);
-int split(char *string, char *seperator, char *argv[]);
+time_t get_recent_mtime(fileInfo *head, char *last_filepath);//가장 최근 수정한 파일 찾기
+void delete_prompt(void);//delete 프롬프트 실행
+void logging(int cmd,fileInfo *log_file);//로그 기록 남기기
+int split(char *string, char *seperator, char *argv[]);//구분자 기준으로 토큰 얻기
 
 int main(void){
 	int argc=0;
@@ -749,10 +753,6 @@ int md5(char *target_path, char *hash_result){
 	return 0;
 }
 
-void hash_func(char *path, char *hash){
-	md5(path, hash);
-}
-
 void dir_traverse(dirList *dirlist){
 	dirList *cur = dirlist->next;
 	dirList *subdirs = (dirList *)malloc(sizeof(dirList));
@@ -811,7 +811,7 @@ void dir_traverse(dirList *dirlist){
 
 				
 				memset(hash, 0, HASHMAX);
-				hash_func(fullpath, hash);//해쉬 얻기
+				md5(fullpath, hash);//해쉬 얻기
 				thread_data_array[t].hash=hash;
 
 				path_extension = get_extension(fullpath);
@@ -1101,10 +1101,16 @@ void delete_prompt(void){
 			printf("Left file in #%d : %s (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
 		else if(flag_t==1){
+			FILE *fp;
+			time_t curTime=time(NULL);
+			long long filesize;
+			char now[STRMAX];
 			fileInfo *tmp;
 			fileInfo *deleted = target_infolist_p->next;
 			char move_to_trash[PATHMAX];
+			char write_trash_info[PATHMAX];
 			char filename[PATHMAX];
+
 
 			while (deleted != NULL){
 				tmp = deleted->next;
@@ -1115,25 +1121,41 @@ void delete_prompt(void){
 				}
 
 				memset(move_to_trash, 0, sizeof(move_to_trash));
+				memset(write_trash_info,0,sizeof(write_trash_info));
 				memset(filename, 0, sizeof(filename));
 
 				sprintf(move_to_trash, "%s%s", trash_path, strrchr(deleted->path, '/') + 1);
+				sprintf(write_trash_info,"%s%s",trash_path_info,strrchr(deleted->path,'/')+1);
 
 				if (access(move_to_trash, F_OK) == 0){
 					get_new_file_name(deleted->path, filename);
 
 					strncpy(strrchr(move_to_trash, '/') + 1, filename, strlen(filename));
+					strncpy(strrchr(write_trash_info, '/') + 1, filename, strlen(filename));
 				}
 				else
 					strcpy(filename, strrchr(deleted->path, '/') + 1);
 
+				filesize=deleted->statbuf.st_size;
 				if (rename(deleted->path, move_to_trash) == -1){
 					printf("ERROR: Fail to move duplicates to Trash\n");
 					continue;
 				}
+				logging(REMOVE,deleted);
+				strcat(write_trash_info,".trashinfo");
+
+				if((fp=fopen(write_trash_info,"w"))==NULL){
+					fprintf(stderr,"open error for %s\n",write_trash_info);
+					continue;
+				}
+
+				sec_to_ymdt(localtime(&curTime),now);
+
+				fprintf(fp,"%s %lld %s",deleted->path,filesize,now);
 
 				free(deleted);
 				deleted = tmp;
+				fclose(fp);
 			}
 
 			filelist_delete_node(dups_list_h, target_filelist_p->hash);
@@ -1145,7 +1167,6 @@ void delete_prompt(void){
 			fileInfo *deleted_list = (fileInfo *)malloc(sizeof(fileInfo));
 			fileInfo *tmp;
 			int listcnt = fileinfolist_size(target_infolist_p);
-
 
 			while (fileinfo_cur != NULL && listcnt--){
 				printf("Delete \"%s\"? [y/n] ", fileinfo_cur->path);
@@ -1202,6 +1223,42 @@ void delete_prompt(void){
 
 		filelist_print_format(dups_list_h);
 	}
+}
+
+//로그 기록 남기기
+void logging(int cmd,fileInfo *log_file){
+	FILE *fp;
+	time_t curTime=time(NULL);
+	char now[STRMAX];
+	struct passwd *pwd;
+
+	if((fp=fopen(log_path,"a"))==NULL){
+		fprintf(stderr,"fopen error for %s\n",log_path);
+		exit(1);
+	}
+
+	if(cmd=REMOVE)
+		fprintf(fp,"%s ","[REMOVE]");
+	else if(cmd=DELETE)
+		fprintf(fp,"%s ","[DELETE]");
+	else if(cmd=RESTORE)
+		fprintf(fp,"%s ","[RESTORE]");
+
+	sec_to_ymdt(localtime(&curTime),now);
+
+	if((pwd=getpwuid(getuid()))==NULL){
+		if(errno==0||errno == ENOENT || errno == ESRCH || errno == EBADF || errno == EPERM) { 
+			printf("미등록 된 사용자입니다.\n"); 
+			return ; 
+		} 
+		else { 
+			printf("error: %s\n", strerror(errno)); 
+			return ; 
+		} 
+	}
+	
+	fprintf(fp,"%s %s %s\n",log_file->path,now,pwd->pw_name);
+	fclose(fp);
 }
 
 //단위를 byte로 바꿔주는 함수
