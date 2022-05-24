@@ -24,6 +24,7 @@
 #define FILEMAX 255
 #define PATHMAX 4096
 #define THREADMAX 4
+#define TIMEMAX 15
 
 #define DIRECTORY 1
 #define REGFILE 2
@@ -60,6 +61,14 @@ typedef struct dirList {
 	struct dirList *next;
 } dirList;
 
+typedef struct trashInfo {
+	char path[PATHMAX];
+	char restorepath[PATHMAX];
+	char date[TIMEMAX];
+	char time[TIMEMAX];
+	struct stat statbuf;
+} trashInfo;
+
 typedef struct thread_data{
 	char *hash;
 	char *filename;
@@ -75,6 +84,8 @@ long long minbsize;
 long long maxbsize;
 fileList *dups_list_h;
 fileList *dups_list_l;
+trashInfo *trash_list[STRMAX];
+int	trash_length;
 thread_data thread_data_array[THREADMAX];
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 int thread_num;
@@ -91,6 +102,11 @@ void list_swap(fileInfo *a,fileInfo *b);
 void list_init(char *l_argv,char *c_argv,char *o_argv);
 void command_trash(int argc,char *argv[]);//trash 명령어
 void command_restore(int argc,char *argv[]);//restore 명령어
+int filename_compare(const void *v1, const void *v2);
+int size_compare(const void *v1, const void *v2);
+int date_compare(const void *v1, const void *v2);
+int time_compare(const void *v1, const void *v2);
+void trashlist_build(void);
 void command_help(void);//help 명령어
 void fileinfo_append(fileInfo *head, char *path);//파일 정보 추가
 fileInfo *fileinfo_delete_node(fileInfo *head, char *path);
@@ -123,10 +139,9 @@ void dir_traverse(dirList *dirlist);//BFS 재귀 탐색
 void *regfile_thread(void *arg);
 void find_duplicates(void);//중복 찾기
 void remove_no_duplicates(void);//중복 아닌거 삭제
-void remove_no_duplicates(void);
 time_t get_recent_mtime(fileInfo *head, char *last_filepath);//가장 최근 수정한 파일 찾기
 void delete_prompt(void);//delete 프롬프트 실행
-void logging(int cmd,fileInfo *log_file);//로그 기록 남기기
+void logging(int cmd,char *log_path);//로그 기록 남기기
 int split(char *string, char *seperator, char *argv[]);//구분자 기준으로 토큰 얻기
 
 int main(void){
@@ -139,6 +154,9 @@ int main(void){
 		fgets(input,sizeof(input),stdin);
 		input[strlen(input)-1]='\0';
 		argc=split(input," ",argv);
+
+		get_trash_path();
+		get_log_path();
 		
 		if(argc==0)
 			continue;
@@ -337,8 +355,8 @@ void command_fmd5(int argc, char *argv[]){
 
 	printf("Searching time: %ld:%06ld(sec:usec)\n\n", end_t.tv_sec, end_t.tv_usec);
 
-	get_trash_path();
-	get_log_path();
+	//get_trash_path();
+	//get_log_path();
 
 	delete_prompt();
 }
@@ -486,8 +504,167 @@ void list_swap(fileInfo *a,fileInfo *b){
 }
 
 void command_trash(int argc,char *argv[]){
+	int flag_c=0,flag_o=0;
+	int opt;
+	char *c_argv,*o_argv;
+
+	if(argc>5){
+		printf("usage: trash -c [CATEGORY] -o [ORDER]\n");
+		return;
+	}
+
+	optind=0;
+	while((opt=getopt(argc,argv,"c:o:"))!=EOF){
+		switch(opt){
+			case 'c':
+				flag_c=1;
+				c_argv=optarg;
+				break;
+			case 'o':
+				flag_o=1;
+				o_argv=optarg;
+				break;
+			case '?':
+				printf("Unknown option : %c\n",optopt);
+				return;
+		}
+	}
+
+	if(flag_c==0)
+		c_argv="filename";
+	if(flag_o==0)
+		o_argv="1";
+
+	if(strcmp(c_argv,"filename")&&strcmp(c_argv,"size")&&strcmp(c_argv,"date")&&strcmp(c_argv,"time")){
+		printf("'-c' option error\n");
+		return;
+	}
+	if(strcmp(o_argv,"1")&&strcmp(o_argv,"-1")){
+		printf("'-o' option error\n");
+		return;
+	}
+	
+	trashlist_build();
+
+	if(!strcmp(c_argv,"filename"))
+		qsort(*trash_list,trash_length,sizeof(trashInfo *),filename_compare);
+	else if(!strcmp(c_argv,"size"))
+		qsort(*trash_list,trash_length,sizeof(trashInfo *),size_compare);
+	else if(!strcmp(c_argv,"date"))
+		qsort(*trash_list,trash_length,sizeof(trashInfo *),date_compare);
+	else if(!strcmp(c_argv,"time"))
+		qsort(*trash_list,trash_length,sizeof(trashInfo *),time_compare);
+	
+	if(trash_length==0)
+		printf("empty trash\n");
+	else{
+		printf("      %-80s%-20s%-20s%-20s\n","FILENAME","SIZE","DELETION DATE","DELETION TIME");
+		if(!strcmp(o_argv,"1"))
+			for(int i=0;i<trash_length;i++)
+				printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[i]->restorepath,(long long)trash_list[i]->statbuf.st_size,trash_list[i]->date,trash_list[i]->time);
+		else if(!strcmp(o_argv,"-1"))
+			for(int i=0;i<trash_length;i++)
+				printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[trash_length-1-i]->restorepath,(long long)trash_list[trash_length-1-i]->statbuf.st_size,trash_list[trash_length-1-i]->date,trash_list[trash_length-1-i]->time);
+	}
 }
+
+int filename_compare(const void *v1, const void *v2){
+	trashInfo *t1=(trashInfo *)v1;
+	trashInfo *t2=(trashInfo *)v2;
+	return strcmp(t1->restorepath,t2->restorepath);
+}
+
+int size_compare(const void *v1, const void *v2){
+	trashInfo *t1=(trashInfo *)v1;
+    trashInfo *t2=(trashInfo *)v2;
+	return t1->statbuf.st_size-t2->statbuf.st_size;
+}
+
+int date_compare(const void *v1, const void *v2){
+	trashInfo *t1=(trashInfo *)v1;
+    trashInfo *t2=(trashInfo *)v2;
+	return strcmp(t1->date,t2->date);
+}
+
+int time_compare(const void *v1, const void *v2){
+	trashInfo *t1=(trashInfo *)v1;
+    trashInfo *t2=(trashInfo *)v2;
+	return strcmp(t1->time,t2->time);
+}
+
+
+void trashlist_build(void){
+	struct dirent **namelist;
+	int listcnt;
+	char input[BUFMAX];
+	int argc=0;
+	char *argv[ARGMAX];
+
+	for(int i=0;i<trash_length;i++)
+		free(trash_list[i]);
+	memset(trash_list,0,sizeof(trash_list));
+	trash_length=0;
+
+	listcnt=get_dirlist(trash_path_info,&namelist);
+
+	for(int i=0;i<listcnt;i++){
+		FILE *fp;
+		char fullpath[PATHMAX]={0,};
+		char filename[NAMEMAX]={0,};
+		char path[PATHMAX]={0,};
+	
+		trashInfo *new=(trashInfo *)malloc(sizeof(trashInfo));
+		
+		if (!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, ".."))
+			continue;
+
+		get_fullpath(trash_path_info,namelist[i]->d_name,fullpath);
+		get_filename(fullpath,filename);
+		get_fullpath(trash_path,filename,path);
+
+		if((fp=fopen(fullpath,"r"))==NULL){
+			printf("open error\n");
+			continue;
+		}
+
+		fgets(input,sizeof(input),fp);
+		input[strlen(input)-1]='\0';
+		argc=split(input,"#",argv);
+		
+		strcpy(new->path,path);
+		strcpy(new->restorepath,argv[0]);
+		strcpy(new->date,argv[1]);
+		strcpy(new->time,argv[2]);
+		lstat(new->path,&new->statbuf);
+
+		trash_list[trash_length++]=new;
+	}
+}
+
 void command_restore(int argc,char *argv[]){
+	int index;
+
+	if(argc!=2){
+		printf("usage: restore [index]\n");
+		return;
+	}
+
+	index=atoi(argv[1]);
+	if(index<1||index>trash_length){
+		printf("index error\n");
+		return;
+	}
+
+	//log남기기
+	logging(RESTORE,trash_list[--index]->restorepath);
+	//복원
+	rename(trash_list[index]->path,trash_list[index]->restorepath);
+
+	//info파일 없애기
+	
+	//node추가
+	
+
 }
 
 void fileinfo_append(fileInfo *head, char *path){
@@ -1218,8 +1395,13 @@ void delete_prompt(void){
 
 		set_idx = atoi(l_argv);
 
-		while (--set_idx)
+		while (--set_idx){
+			//삭제되고 하나 남았을 경우 idx 제외
+			if(target_filelist_p->fileInfoList->next->next==NULL)
+				set_idx++;
+
 			target_filelist_p = target_filelist_p->next;
+		}
 
 		target_infolist_p = target_filelist_p->fileInfoList;
 
@@ -1250,7 +1432,6 @@ void delete_prompt(void){
 		else if(flag_t==1){
 			FILE *fp;
 			time_t curTime=time(NULL);
-			long long filesize;
 			char now[STRMAX];
 			fileInfo *tmp;
 			fileInfo *deleted = target_infolist_p->next;
@@ -1283,12 +1464,11 @@ void delete_prompt(void){
 				else
 					strcpy(filename, strrchr(deleted->path, '/') + 1);
 
-				filesize=deleted->statbuf.st_size;
 				if (rename(deleted->path, move_to_trash) == -1){
 					printf("ERROR: Fail to move duplicates to Trash\n");
 					continue;
 				}
-				logging(REMOVE,deleted);
+				logging(REMOVE,deleted->path);
 				strcat(write_trash_info,".trashinfo");
 
 				if((fp=fopen(write_trash_info,"w"))==NULL){
@@ -1298,7 +1478,7 @@ void delete_prompt(void){
 
 				sec_to_ymdt(localtime(&curTime),now);
 
-				fprintf(fp,"%s %lld %s",deleted->path,filesize,now);
+				fprintf(fp,"%s#%s",deleted->path,now);
 				fileinfo_delete_node(target_filelist_p->fileInfoList,deleted->path);
 
 				free(deleted);
@@ -1373,7 +1553,7 @@ void delete_prompt(void){
 }
 
 //로그 기록 남기기
-void logging(int cmd,fileInfo *log_file){
+void logging(int cmd,char *log_file){
 	FILE *fp;
 	time_t curTime=time(NULL);
 	char now[STRMAX];
@@ -1404,7 +1584,7 @@ void logging(int cmd,fileInfo *log_file){
 		} 
 	}
 	
-	fprintf(fp,"%s %s %s\n",log_file->path,now,pwd->pw_name);
+	fprintf(fp,"%s %s %s\n",log_file,now,pwd->pw_name);
 	fclose(fp);
 }
 
