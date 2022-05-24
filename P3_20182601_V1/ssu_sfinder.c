@@ -643,6 +643,9 @@ void trashlist_build(void){
 
 void command_restore(int argc,char *argv[]){
 	int index;
+	char fullpath[PATHMAX];
+	char filename[NAMEMAX];
+	char hash[HASHMAX];
 
 	if(argc!=2){
 		printf("usage: restore [index]\n");
@@ -657,13 +660,34 @@ void command_restore(int argc,char *argv[]){
 
 	//log남기기
 	logging(RESTORE,trash_list[--index]->restorepath);
+
 	//복원
 	rename(trash_list[index]->path,trash_list[index]->restorepath);
 
 	//info파일 없애기
-	
+	get_filename(trash_list[index]->path,filename);
+	get_fullpath(trash_path_info,filename,fullpath);
+	remove(fullpath);
+
 	//node추가
-	
+	md5(trash_list[index]->restorepath,hash);
+	index=filelist_search(dups_list_h,hash);
+	fileList *filelist_cur=dups_list_h;
+	while(index--)
+		filelist_cur=filelist_cur->next;
+	fileinfo_append(filelist_cur->fileInfoList,trash_list[index]->path);
+
+	trashlist_build();
+
+	qsort(*trash_list,trash_length,sizeof(trashInfo *),filename_compare);
+
+	if(trash_length==0)
+		printf("empty trash\n");
+	else{
+		printf("      %-80s%-20s%-20s%-20s\n","FILENAME","SIZE","DELETION DATE","DELETION TIME");
+		for(int i=0;i<trash_length;i++)
+			printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[i]->restorepath,(long long)trash_list[i]->statbuf.st_size,trash_list[i]->date,trash_list[i]->time);
+	}
 
 }
 
@@ -1421,6 +1445,7 @@ void delete_prompt(void){
 					deleted = tmp;
 					continue;
 				}
+				logging(DELETE,deleted->path);
 				remove(deleted->path);
 				free(deleted);
 				deleted = tmp;
@@ -1501,6 +1526,7 @@ void delete_prompt(void){
 				fgets(ans, sizeof(ans), stdin);
 
 				if (!strcmp(ans, "y\n") || !strcmp(ans, "Y\n")){
+					logging(DELETE,fileinfo_cur->path);
 					remove(fileinfo_cur->path);
 					fileinfo_cur = fileinfo_delete_node(target_infolist_p, fileinfo_cur->path);
 				}
@@ -1537,6 +1563,7 @@ void delete_prompt(void){
 				deleted = deleted->next;
 
 			printf("\"%s\" has been deleted in #%d\n\n", deleted->path, atoi(l_argv));
+			logging(DELETE,deleted->path);
 			remove(deleted->path);
 			fileinfo_delete_node(target_infolist_p, deleted->path);
 
