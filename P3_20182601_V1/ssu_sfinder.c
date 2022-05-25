@@ -92,31 +92,30 @@ int thread_num;
 int work_thread;
 int t;
 
-void fileinfolist_free(fileInfo *head);
-void dupslist_free(void);
+void fileinfolist_free(fileInfo *head);//fileinfolist free 시킴
+void dupslist_free(void);//dups_list를 free시킴
 void command_fmd5(int argc,char *argv[]);//fmd5 명령어
 void command_list(int argc,char *argv[]);//list 명령어
-void set_swap(fileList *a,fileList *b);
-void list_swap(fileInfo *a,fileInfo *b);
-void list_init(char *l_argv,char *c_argv,char *o_argv);
+void set_swap(fileList *a,fileList *b);//세트끼리 데이터 바꾸기
+void list_swap(fileInfo *a,fileInfo *b);//리스트들끼리 데이터 바꾸기
 void command_trash(int argc,char *argv[]);//trash 명령어
 void command_restore(int argc,char *argv[]);//restore 명령어
-int filename_compare(const void *v1, const void *v2);
-int size_compare(const void *v1, const void *v2);
-int date_compare(const void *v1, const void *v2);
-int time_compare(const void *v1, const void *v2);
-void trashlist_build(void);
+int filename_compare(const void *v1, const void *v2);//list를 filename에 따라 정렬
+int size_compare(const void *v1, const void *v2);//set를 size에 따라 정렬
+int date_compare(const void *v1, const void *v2);//list를 date에 따라 정렬
+int time_compare(const void *v1, const void *v2);//list를 time에 따라 정렬
+void trashlist_build(void);//trash 파일 정보 넣기
 void command_help(void);//help 명령어
 void fileinfo_append(fileInfo *head, char *path);//파일 정보 추가
-fileInfo *fileinfo_delete_node(fileInfo *head, char *path);
+fileInfo *fileinfo_delete_node(fileInfo *head, char *path);//fileinfo 노드를 삭제
 int fileinfolist_size(fileInfo *head);//해당 리스트 개수 세주는거
-void filelist_append(fileList *head, long long filesize, char *path, char *hash);
+void filelist_append(fileList *head, long long filesize, char *path, char *hash);//filelist 추가와 동시에 fileInfo추가
 void filelist_delete_node(fileList *head, char *hash);//파일 리스트 없애기
-int filelist_size(fileList *head);
-int filelist_search(fileList *head, char *hash);
-void dirlist_append(dirList *head, char *path);
-void dirlist_print(dirList *head, int index);
-void dirlist_delete_all(dirList *head);
+int filelist_size(fileList *head);//filelist 개수 구해주기
+int filelist_search(fileList *head, char *hash);//filelist 찾기
+void dirlist_append(dirList *head, char *path);//dirlist 추가
+void dirlist_print(dirList *head, int index);//dirlist 출력
+void dirlist_delete_all(dirList *head);//dirlist 삭제
 void get_path_from_home(char *path, char *path_from_home);//'~' 절대경로 찾아주기
 int is_dir(char *target_dir);//디렉토리인지
 long long get_size(char *filesize);//파일 사이즈 얻기
@@ -135,7 +134,7 @@ void sec_to_ymdt(struct tm *time, char *ymdt);//시간 출력
 void filelist_print_format(fileList *head);//중복리스트 출력
 int md5(char *target_path, char *hash_result);//md5 해시값 얻기
 void dir_traverse(dirList *dirlist);//BFS 재귀 탐색
-void *record_thread(void *arg);
+void *record_thread(void *arg);//쓰레드 코드(미구현)
 void find_duplicates(void);//중복 찾기
 void remove_no_duplicates(void);//중복 아닌거 삭제
 time_t get_recent_mtime(fileInfo *head, char *last_filepath);//가장 최근 수정한 파일 찾기
@@ -154,12 +153,14 @@ int main(void){
 		input[strlen(input)-1]='\0';
 		argc=split(input," ",argv);
 
+		//trash path와 trash info 경로를 얻음
 		get_trash_path();
 		get_log_path();
 		
 		if(argc==0)
 			continue;
 
+		//각 내장명령어에 따라 함수 실행
 		if(!strcmp(argv[0], "fmd5"))
 			command_fmd5(argc,argv);
 
@@ -353,9 +354,6 @@ void command_fmd5(int argc, char *argv[]){
 		filelist_print_format(dups_list_h);
 
 	printf("Searching time: %ld:%06ld(sec:usec)\n\n", end_t.tv_sec, end_t.tv_usec);
-
-	//get_trash_path();
-	//get_log_path();
 
 	delete_prompt();
 }
@@ -678,22 +676,8 @@ void command_restore(int argc,char *argv[]){
 	strcat(fullpath,".trashinfo");
 	remove(fullpath);
 
-	//node추가
-	/*
-	if(dups_list_h!=NULL){
-		md5(trash_list[index]->restorepath,hash);
-		index=filelist_search(dups_list_h,hash);
-		fileList *filelist_cur=dups_list_h;
-		while(index--)
-			filelist_cur=filelist_cur->next;
-		fileinfo_append(filelist_cur->fileInfoList,trash_list[index]->path);
-	}
-	 */
-
 	trashlist_build();
-
 	qsort(*trash_list,trash_length,sizeof(trashInfo *),filename_compare);
-
 	if(trash_length==0)
 		printf("empty trash\n");
 	else{
@@ -1164,7 +1148,7 @@ void dir_traverse(dirList *dirlist){
 		memset(&thread_data_array[i],0,sizeof(thread_data));
 	memset(subdirs, 0 , sizeof(dirList));
 
-	while (cur != NULL){//while문이 왜 있는지 궁금...
+	while (cur != NULL){
 		struct dirent **namelist;
 		int listcnt;
 
@@ -1200,40 +1184,6 @@ void dir_traverse(dirList *dirlist){
 			if (file_mode == DIRECTORY)
 				dirlist_append(subdirs, fullpath);
 			else if (file_mode == REGFILE){
-				/*
-				char filename[PATHMAX*2];
-				char *path_extension;
-				char hash[HASHMAX];
-
-				sprintf(filename, "%s/%lld", same_size_files_dir, filesize);
-
-				memset(hash, 0, HASHMAX);
-				md5(fullpath, hash);//해쉬 얻기
-
-				path_extension = get_extension(fullpath);
-
-				
-				if (strlen(extension) != 0){
-					if (path_extension == NULL || strcmp(extension, path_extension))
-						continue;
-				}
-
-				thread_data_array[t].hash=hash;
-				thread_data_array[t].filename=filename;
-				thread_data_array[t].fullpath=fullpath;
-
-				if(pthread_create(&tid[t],NULL,record_thread,(void *)&thread_data_array[t])!=0){
-					fprintf(stderr,"pthread_create error\n");
-					return;
-				}
-
-				t++;
-				if(t>=thread_num){
-					for(int k=0;k<thread_num;k++)
-						pthread_join(tid[k],(void *)&status);
-					t=0;
-				}
-				*/
 				FILE *fp;
 				char filename[PATHMAX*2];
 				char *path_extension;
@@ -1295,7 +1245,6 @@ void *record_thread(void *arg){
 
 	fclose(fp);
 }
-
 
 void *regfile_thread(void *arg){
 	FILE *fp;
@@ -1487,9 +1436,6 @@ void delete_prompt(void){
 
 		while (--set_idx){
 			target_filelist_p = target_filelist_p->next;
-			//삭제되고 하나 남았을 경우 idx 제외
-//			if(target_filelist_p->fileInfoList->next->next==NULL)
-//				set_idx++;
 		}
 
 		target_infolist_p = target_filelist_p->fileInfoList;
@@ -1569,7 +1515,6 @@ void delete_prompt(void){
 				sec_to_ymdt(localtime(&curTime),now);
 
 				fprintf(fp,"%s#%s",deleted->path,now);
-//				fileinfo_delete_node(target_filelist_p->fileInfoList,deleted->path);
 
 				free(deleted);
 				deleted = tmp;
