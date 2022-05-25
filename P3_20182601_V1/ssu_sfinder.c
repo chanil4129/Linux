@@ -90,7 +90,6 @@ thread_data thread_data_array[THREADMAX];
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 int thread_num;
 int work_thread;
-pthread_t tid[THREADMAX];
 int t;
 
 void fileinfolist_free(fileInfo *head);
@@ -136,7 +135,7 @@ void sec_to_ymdt(struct tm *time, char *ymdt);//시간 출력
 void filelist_print_format(fileList *head);//중복리스트 출력
 int md5(char *target_path, char *hash_result);//md5 해시값 얻기
 void dir_traverse(dirList *dirlist);//BFS 재귀 탐색
-void *regfile_thread(void *arg);
+void *record_thread(void *arg);
 void find_duplicates(void);//중복 찾기
 void remove_no_duplicates(void);//중복 아닌거 삭제
 time_t get_recent_mtime(fileInfo *head, char *last_filepath);//가장 최근 수정한 파일 찾기
@@ -266,7 +265,7 @@ void command_fmd5(int argc, char *argv[]){
 	if(flag_t==0){
 		t_argv="1";
 	}
-	thread_num=atoi(t_argv)-1;
+	thread_num=atoi(t_argv);
 	
 	if(strchr(e_argv,'*')==NULL){
 		printf("ERROR: [FILE_EXTENSION] should be '*' or '*.extension'\n");
@@ -1144,6 +1143,7 @@ int md5(char *target_path, char *hash_result){
 void dir_traverse(dirList *dirlist){
 	dirList *cur = dirlist->next;
 	dirList *subdirs = (dirList *)malloc(sizeof(dirList));
+	pthread_t tid[THREADMAX];
 	int status;
 	t=0;
 
@@ -1156,7 +1156,7 @@ void dir_traverse(dirList *dirlist){
 		int listcnt;
 
 		listcnt = get_dirlist(cur->dirpath, &namelist);
-
+		pthread_mutex_lock(&mutex);
 		//하위 디렉토리(fullpath)
 		for (int i = 0; i < listcnt; i++){
 			char fullpath[PATHMAX] = {0, };
@@ -1187,7 +1187,6 @@ void dir_traverse(dirList *dirlist){
 			if (file_mode == DIRECTORY)
 				dirlist_append(subdirs, fullpath);
 			else if (file_mode == REGFILE){
-				FILE *fp;
 				char filename[PATHMAX*2];
 				char *path_extension;
 				char hash[HASHMAX];
@@ -1205,6 +1204,25 @@ void dir_traverse(dirList *dirlist){
 						continue;
 				}
 
+				thread_data_array[t].hash=hash;
+				thread_data_array[t].filename=filename;
+				thread_data_array[t].fullpath=fullpath;
+
+				if(pthread_create(&tid[t],NULL,record_thread,(void *)&thread_data_array[t])!=0){
+					fprintf(stderr,"pthread_create error\n");
+					return;
+				}
+
+				t++;
+				if(t>=thread_num){
+					for(int k=0;k<thread_num;k++)
+						pthread_join(tid[k],(void *)&status);
+					t=0;
+				}
+				
+				
+
+				/*
 				if ((fp = fopen(filename, "a")) == NULL){
 					printf("ERROR: fopen error for %s\n", filename);
 					return;
@@ -1213,10 +1231,12 @@ void dir_traverse(dirList *dirlist){
 				fprintf(fp, "%s %s\n", hash, fullpath);
 
 				fclose(fp);
+				*/
 
 			}
 		}
 		cur = cur->next;
+		pthread_mutex_unlock(&mutex);
 	}
 
 	dirlist_delete_all(dirlist);
@@ -1225,10 +1245,30 @@ void dir_traverse(dirList *dirlist){
 	free(subdirs);
 	if (dirlist->next != NULL)
 		dir_traverse(dirlist);
-	
 
 }
 
+void *record_thread(void *arg){
+	FILE *fp;
+	struct thread_data *data;
+	char *filename;
+	char *fullpath;
+	char *hash;
+
+	data=(struct thread_data *)arg;
+	filename=data->filename;
+	fullpath=data->fullpath;
+	hash=data->hash;
+
+	if ((fp = fopen(filename, "a")) == NULL){
+		printf("ERROR: fopen error for %s\n", filename);
+		exit(1);
+	}
+
+	fprintf(fp, "%s %s\n", hash, fullpath);
+
+	fclose(fp);
+}
 
 
 void *regfile_thread(void *arg){
