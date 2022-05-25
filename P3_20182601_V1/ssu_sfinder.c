@@ -558,12 +558,16 @@ void command_trash(int argc,char *argv[]){
 		printf("empty trash\n");
 	else{
 		printf("      %-80s%-20s%-20s%-20s\n","FILENAME","SIZE","DELETION DATE","DELETION TIME");
-		if(!strcmp(o_argv,"1"))
-			for(int i=0;i<trash_length;i++)
-				printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[i]->restorepath,(long long)trash_list[i]->statbuf.st_size,trash_list[i]->date,trash_list[i]->time);
-		else if(!strcmp(o_argv,"-1"))
-			for(int i=0;i<trash_length;i++)
-				printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[trash_length-1-i]->restorepath,(long long)trash_list[trash_length-1-i]->statbuf.st_size,trash_list[trash_length-1-i]->date,trash_list[trash_length-1-i]->time);
+		if(!strcmp(o_argv,"-1")){
+			for(int i=0;i<trash_length/2;i++){
+				trashInfo *temp;
+				temp=trash_list[i];
+				trash_list[i]=trash_list[trash_length-1-i];
+				trash_list[trash_length-1-i]=temp;
+			}
+		}
+		for(int i=0;i<trash_length;i++)
+			printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[i]->restorepath,(long long)trash_list[i]->statbuf.st_size,trash_list[i]->date,trash_list[i]->time);
 	}
 }
 
@@ -645,6 +649,7 @@ void command_restore(int argc,char *argv[]){
 	char fullpath[PATHMAX];
 	char filename[NAMEMAX];
 	char hash[HASHMAX];
+	char *pt=NULL;
 
 	if(argc!=2){
 		printf("usage: restore [index]\n");
@@ -664,17 +669,26 @@ void command_restore(int argc,char *argv[]){
 	rename(trash_list[index]->path,trash_list[index]->restorepath);
 
 	//info파일 없애기
+	pt=get_extension(trash_list[index]->path);
 	get_filename(trash_list[index]->path,filename);
-	get_fullpath(trash_path_info,filename,fullpath);
+	strcpy(fullpath,trash_path_info);
+	strcat(fullpath,filename);
+	strcat(fullpath,".");
+	strcat(fullpath,pt);
+	strcat(fullpath,".trashinfo");
 	remove(fullpath);
 
 	//node추가
-	md5(trash_list[index]->restorepath,hash);
-	index=filelist_search(dups_list_h,hash);
-	fileList *filelist_cur=dups_list_h;
-	while(index--)
-		filelist_cur=filelist_cur->next;
-	fileinfo_append(filelist_cur->fileInfoList,trash_list[index]->path);
+	/*
+	if(dups_list_h!=NULL){
+		md5(trash_list[index]->restorepath,hash);
+		index=filelist_search(dups_list_h,hash);
+		fileList *filelist_cur=dups_list_h;
+		while(index--)
+			filelist_cur=filelist_cur->next;
+		fileinfo_append(filelist_cur->fileInfoList,trash_list[index]->path);
+	}
+	 */
 
 	trashlist_build();
 
@@ -687,7 +701,6 @@ void command_restore(int argc,char *argv[]){
 		for(int i=0;i<trash_length;i++)
 			printf("[%3d] %-80s%-20lld%-20s%-20s\n",i+1,trash_list[i]->restorepath,(long long)trash_list[i]->statbuf.st_size,trash_list[i]->date,trash_list[i]->time);
 	}
-
 }
 
 void fileinfo_append(fileInfo *head, char *path){
@@ -1187,6 +1200,7 @@ void dir_traverse(dirList *dirlist){
 			if (file_mode == DIRECTORY)
 				dirlist_append(subdirs, fullpath);
 			else if (file_mode == REGFILE){
+				/*
 				char filename[PATHMAX*2];
 				char *path_extension;
 				char hash[HASHMAX];
@@ -1219,10 +1233,24 @@ void dir_traverse(dirList *dirlist){
 						pthread_join(tid[k],(void *)&status);
 					t=0;
 				}
-				
-				
+				*/
+				FILE *fp;
+				char filename[PATHMAX*2];
+				char *path_extension;
+				char hash[HASHMAX];
 
-				/*
+				sprintf(filename, "%s/%lld", same_size_files_dir, filesize);
+
+				memset(hash, 0, HASHMAX);
+				md5(fullpath, hash);//해쉬 얻기
+
+				path_extension = get_extension(fullpath);
+
+				if (strlen(extension) != 0){
+					if (path_extension == NULL || strcmp(extension, path_extension))
+						continue;
+				}
+
 				if ((fp = fopen(filename, "a")) == NULL){
 					printf("ERROR: fopen error for %s\n", filename);
 					return;
@@ -1231,8 +1259,6 @@ void dir_traverse(dirList *dirlist){
 				fprintf(fp, "%s %s\n", hash, fullpath);
 
 				fclose(fp);
-				*/
-
 			}
 		}
 		cur = cur->next;
@@ -1460,11 +1486,10 @@ void delete_prompt(void){
 		set_idx = atoi(l_argv);
 
 		while (--set_idx){
-			//삭제되고 하나 남았을 경우 idx 제외
-			if(target_filelist_p->fileInfoList->next->next==NULL)
-				set_idx++;
-
 			target_filelist_p = target_filelist_p->next;
+			//삭제되고 하나 남았을 경우 idx 제외
+//			if(target_filelist_p->fileInfoList->next->next==NULL)
+//				set_idx++;
 		}
 
 		target_infolist_p = target_filelist_p->fileInfoList;
@@ -1544,13 +1569,14 @@ void delete_prompt(void){
 				sec_to_ymdt(localtime(&curTime),now);
 
 				fprintf(fp,"%s#%s",deleted->path,now);
-				fileinfo_delete_node(target_filelist_p->fileInfoList,deleted->path);
+//				fileinfo_delete_node(target_filelist_p->fileInfoList,deleted->path);
 
 				free(deleted);
 				deleted = tmp;
 				fclose(fp);
 			}
 
+			filelist_delete_node(dups_list_h, target_filelist_p->hash);
 			printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
 		else if(flag_i==1){
@@ -1631,11 +1657,11 @@ void logging(int cmd,char *log_file){
 		exit(1);
 	}
 
-	if(cmd=REMOVE)
+	if(cmd==REMOVE)
 		fprintf(fp,"%s ","[REMOVE]");
-	else if(cmd=DELETE)
+	else if(cmd==DELETE)
 		fprintf(fp,"%s ","[DELETE]");
-	else if(cmd=RESTORE)
+	else if(cmd==RESTORE)
 		fprintf(fp,"%s ","[RESTORE]");
 
 	sec_to_ymdt(localtime(&curTime),now);
@@ -1723,3 +1749,4 @@ void command_help(void){
 	printf(" > help : prompt command explicate\n");
 	printf(" > exit : ssu_sfinder exit\n");
 }
+
