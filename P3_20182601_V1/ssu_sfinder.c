@@ -183,6 +183,7 @@ int main(void){
 	exit(0);
 }
 
+//dups_list를 free시킴
 void dupslist_free(void){
 	fileList *filelist_cur=dups_list_h->next;
 	fileList *tmp;
@@ -196,6 +197,7 @@ void dupslist_free(void){
 	dups_list_h->next=NULL;
 }
 
+//fileinfolist free 시킴
 void fileinfolist_free(fileInfo *head){
 	fileInfo *fileinfo_cur = head->next;
 	fileInfo *tmp;
@@ -208,6 +210,7 @@ void fileinfolist_free(fileInfo *head){
 	head->next=NULL;
 }
 
+//fmd5 명령어
 void command_fmd5(int argc, char *argv[]){
 	int flag_e=0,flag_l=0,flag_h=0,flag_d=0,flag_t=0;
 	int opt;
@@ -215,6 +218,7 @@ void command_fmd5(int argc, char *argv[]){
 	char target_dir[PATHMAX];
 	dirList *dirlist=(dirList *)malloc(sizeof(dirList));
 
+	//heap영역 초기화
 	dirlist->next=NULL;
 	if(dups_list_h!=NULL){
 		dupslist_free();
@@ -224,6 +228,7 @@ void command_fmd5(int argc, char *argv[]){
 	dups_list_h=(fileList *)malloc(sizeof(fileList));
 	dups_list_h->next=NULL;
 
+	//인자 처리
 	if(argc>11){
 		printf("Usage: find -e [FILE_EXTENSION] -l [MINSIZE] -h [MAXSIZE] -d [DIRECTORY] -t [THREAD NUM]\n");
 		return;
@@ -274,7 +279,7 @@ void command_fmd5(int argc, char *argv[]){
 	}
 
 	if (strchr(e_argv, '.') != NULL){
-		strcpy(extension, get_extension(argv[1]));
+		strcpy(extension, get_extension(e_argv));
 
 		if (strlen(extension) == 0){
 			printf("ERROR: There should be extension\n");
@@ -326,12 +331,13 @@ void command_fmd5(int argc, char *argv[]){
 
 	get_same_size_files_dir();
 	
+	//시간 측정 및 md5 실행 및 결과 출력
 	struct timeval begin_t,end_t;
 
 	gettimeofday(&begin_t,NULL);
 
 	dirlist_append(dirlist,target_dir);
-	dir_traverse(dirlist);
+	dir_traverse(dirlist);//bfs 재귀 탐색
 	free(dirlist);
 	find_duplicates();
 	remove_no_duplicates();
@@ -358,11 +364,13 @@ void command_fmd5(int argc, char *argv[]){
 	delete_prompt();
 }
 
+//list 명령어
 void command_list(int argc,char *argv[]){
 	int flag_l=0,flag_c=0,flag_o=0;
 	int opt;
 	char *l_argv,*c_argv,*o_argv;
 
+	//인자 처리
 	if(argc>7){
 		printf("usage: list -l [LIST_TYPE] -c [CATEGORY] -o [ORDER]\n");
 		return;
@@ -411,8 +419,10 @@ void command_list(int argc,char *argv[]){
 		return;
 	}
 
+	//옵션에 따른 결과 출력
 	fileList *filelist=dups_list_h;
 	int compare;
+	//set에 따른 버블정렬
 	if(!strcmp(l_argv,"fileset")){
 		for(int i=0;i<filelist_size(filelist);i++){
 			fileList *filelist_pre=filelist->next;
@@ -431,6 +441,7 @@ void command_list(int argc,char *argv[]){
 			}
 		}
 	}
+	//list에 따른 버블정렬
 	else{
 		fileList *filelist_cur=filelist->next;
 		for(int k=0;k<filelist_size(filelist);k++){
@@ -469,6 +480,7 @@ void command_list(int argc,char *argv[]){
 	filelist_print_format(dups_list_h);
 }
 
+//세트끼리 데이터 swap
 void set_swap(fileList *a,fileList *b){
 	long long filesize;
 	char hash[HASHMAX];
@@ -487,6 +499,7 @@ void set_swap(fileList *a,fileList *b){
 	b->fileInfoList=fileInfoList;
 }
 
+//리스트끼리 데이터 swap
 void list_swap(fileInfo *a,fileInfo *b){
 	char path[PATHMAX];
 	struct stat statbuf;
@@ -500,11 +513,13 @@ void list_swap(fileInfo *a,fileInfo *b){
 	b->statbuf=statbuf;
 }
 
+//trash 명령어
 void command_trash(int argc,char *argv[]){
 	int flag_c=0,flag_o=0;
 	int opt;
 	char *c_argv,*o_argv;
 
+	//인자 처리
 	if(argc>5){
 		printf("usage: trash -c [CATEGORY] -o [ORDER]\n");
 		return;
@@ -541,8 +556,10 @@ void command_trash(int argc,char *argv[]){
 		return;
 	}
 	
+	//trash 리스트 생성
 	trashlist_build();
 
+	//옵션에 따른 결과 출력
 	if(!strcmp(c_argv,"filename"))
 		qsort(*trash_list,trash_length,sizeof(trashInfo *),filename_compare);
 	else if(!strcmp(c_argv,"size"))
@@ -569,31 +586,35 @@ void command_trash(int argc,char *argv[]){
 	}
 }
 
+//list를 filename에 따라 정렬
 int filename_compare(const void *v1, const void *v2){
 	trashInfo *t1=(trashInfo *)v1;
 	trashInfo *t2=(trashInfo *)v2;
 	return strcmp(t1->restorepath,t2->restorepath);
 }
 
+//set를 size에 따라 정렬
 int size_compare(const void *v1, const void *v2){
 	trashInfo *t1=(trashInfo *)v1;
     trashInfo *t2=(trashInfo *)v2;
 	return t1->statbuf.st_size-t2->statbuf.st_size;
 }
 
+//list를 date에 따라 정렬
 int date_compare(const void *v1, const void *v2){
 	trashInfo *t1=(trashInfo *)v1;
     trashInfo *t2=(trashInfo *)v2;
 	return strcmp(t1->date,t2->date);
 }
 
+//list를 time에 따라 정렬
 int time_compare(const void *v1, const void *v2){
 	trashInfo *t1=(trashInfo *)v1;
     trashInfo *t2=(trashInfo *)v2;
 	return strcmp(t1->time,t2->time);
 }
 
-
+//trash 파일 정보 넣기
 void trashlist_build(void){
 	struct dirent **namelist;
 	int listcnt;
@@ -601,6 +622,7 @@ void trashlist_build(void){
 	int argc=0;
 	char *argv[ARGMAX];
 
+	//정보 초기화
 	for(int i=0;i<trash_length;i++)
 		free(trash_list[i]);
 	memset(trash_list,0,sizeof(trash_list));
@@ -608,6 +630,7 @@ void trashlist_build(void){
 
 	listcnt=get_dirlist(trash_path_info,&namelist);
 
+	//trash 구조체에 정보 추가
 	for(int i=0;i<listcnt;i++){
 		FILE *fp;
 		char fullpath[PATHMAX]={0,};
@@ -642,6 +665,7 @@ void trashlist_build(void){
 	}
 }
 
+//restore 명령어
 void command_restore(int argc,char *argv[]){
 	int index;
 	char fullpath[PATHMAX];
@@ -687,6 +711,7 @@ void command_restore(int argc,char *argv[]){
 	}
 }
 
+//fileinfo(list에) 추가
 void fileinfo_append(fileInfo *head, char *path){
 	fileInfo *fileinfo_cur;
 
@@ -708,6 +733,7 @@ void fileinfo_append(fileInfo *head, char *path){
 
 }
 
+//fileinfo 노드를 삭제
 fileInfo *fileinfo_delete_node(fileInfo *head, char *path){
 	fileInfo *deleted;
 
@@ -732,6 +758,7 @@ fileInfo *fileinfo_delete_node(fileInfo *head, char *path){
 	}
 }
 
+//해당 리스트 개수 세주는거
 int fileinfolist_size(fileInfo *head){
 	fileInfo *cur = head->next;
 	int size = 0;
@@ -744,6 +771,7 @@ int fileinfolist_size(fileInfo *head){
 	return size;
 }
 
+//filelist 추가와 동시에 fileInfo추가
 void filelist_append(fileList *head, long long filesize, char *path, char *hash){
     fileList *newfile = (fileList *)malloc(sizeof(fileList));
     memset(newfile, 0, sizeof(fileList));
@@ -773,6 +801,7 @@ void filelist_append(fileList *head, long long filesize, char *path, char *hash)
     }
 }
 
+//파일 리스트 없애기
 void filelist_delete_node(fileList *head, char *hash){
 	fileList *deleted;
 
@@ -799,6 +828,7 @@ void filelist_delete_node(fileList *head, char *hash){
 	free(deleted);
 }
 
+//filelist 개수 구해주기
 int filelist_size(fileList *head){
 	fileList *cur = head->next;
 	int size = 0;
@@ -811,6 +841,7 @@ int filelist_size(fileList *head){
 	return size;
 }
 
+//filelist 찾기
 int filelist_search(fileList *head, char *hash){
 	fileList *cur = head;
 	int idx = 0;
@@ -825,6 +856,7 @@ int filelist_search(fileList *head, char *hash){
 	return 0;
 }
 
+//dirlist 추가
 void dirlist_append(dirList *head, char *path){
 	dirList *newFile = (dirList *)malloc(sizeof(dirList));
 
@@ -843,6 +875,7 @@ void dirlist_append(dirList *head, char *path){
 	}
 }
 
+//dirlist 출력
 void dirlist_print(dirList *head, int index){
 	dirList *cur = head->next;
 	int i = 1;
@@ -855,6 +888,7 @@ void dirlist_print(dirList *head, int index){
 	}
 }
 
+////dirlist 삭제
 void dirlist_delete_all(dirList *head){
 	dirList *dirlist_cur = head->next;
 	dirList *tmp;
@@ -884,6 +918,7 @@ void get_path_from_home(char *path, char *path_from_home){
     }
 }
 
+//디렉토리인지 
 int is_dir(char *target_dir){
     struct stat statbuf;
 
@@ -895,6 +930,7 @@ int is_dir(char *target_dir){
 
 }
 
+//디렉토리 정규파일 구분
 int get_file_mode(char *target_file, struct stat *statbuf){
 	if (lstat(target_file, statbuf) < 0){
         printf("ERROR: lstat error for %s\n", target_file);
@@ -909,6 +945,7 @@ int get_file_mode(char *target_file, struct stat *statbuf){
     	return 0;
 }
 
+//path+filename
 void get_fullpath(char *target_dir, char *target_file, char *fullpath){
 	strcat(fullpath, target_dir);
 
@@ -919,6 +956,7 @@ void get_fullpath(char *target_dir, char *target_file, char *fullpath){
 	fullpath[strlen(fullpath)] = '\0';
 }
 
+//하위 디렉토리 확인
 int get_dirlist(char *target_dir, struct dirent ***namelist){
 	int cnt = 0;
 
@@ -930,6 +968,7 @@ int get_dirlist(char *target_dir, struct dirent ***namelist){
 	return cnt;
 }
 
+//확장자 뒷부분 포인터 or NULL
 char *get_extension(char *filename){
 	char *tmp_ext;
 
@@ -939,6 +978,7 @@ char *get_extension(char *filename){
 		return NULL;
 }
 
+//파일이름만(.이랑 / 다 빼고)
 void get_filename(char *path, char *filename){
 	char tmp_name[NAMEMAX];
 	char *pt = NULL;
@@ -959,6 +999,7 @@ void get_filename(char *path, char *filename){
 	strcpy(filename, tmp_name);
 }
 
+//버전 높여가면서 새로운 이름짓기(휴지통 관련)
 void get_new_file_name(char *org_filename, char *new_filename){
 	char new_trash_path[PATHMAX];
 	char tmp[NAMEMAX];
@@ -986,6 +1027,7 @@ void get_new_file_name(char *org_filename, char *new_filename){
 		sprintf(new_filename + strlen(new_filename), ".%s", get_extension(org_filename));
 }
 
+//파일 삭제
 void remove_files(char *dir){
 	struct dirent **namelist;
 	int listcnt = get_dirlist(dir, &namelist);
@@ -1002,6 +1044,7 @@ void remove_files(char *dir){
 	}
 }
 
+//중복파일 기록
 void get_same_size_files_dir(void){
 	get_path_from_home("~/20182601", same_size_files_dir);
 
@@ -1011,6 +1054,7 @@ void get_same_size_files_dir(void){
 		mkdir(same_size_files_dir, 0755);
 }
 
+//휴지통 경로 얻기
 void get_trash_path(void){
 	if (getuid() == 0){
 		get_path_from_home("~/.Trash/files/", trash_path);
@@ -1048,7 +1092,7 @@ void get_log_path(void){
 	}
 }
 	
-
+//파일 사이즈에 3자리마다 콤마넣기
 void filesize_with_comma(long long filesize, char *filesize_w_comma){
 	char filesize_wo_comma[STRMAX] = {0, };
 	int comma;
@@ -1067,14 +1111,17 @@ void filesize_with_comma(long long filesize, char *filesize_w_comma){
 	filesize_w_comma[idx] = '\0';
 }
 
+//시간 출력
 void sec_to_ymdt(struct tm *time, char *ymdt){
 	sprintf(ymdt, "%04d-%02d-%02d %02d:%02d:%02d", time->tm_year + 1900, time->tm_mon + 1, time->tm_mday, time->tm_hour, time->tm_min, time->tm_sec);
 }
 
+//중복리스트 출력
 void filelist_print_format(fileList *head){
 	fileList *filelist_cur = head->next;
 	int set_idx = 1;
 
+	//세트 단위
 	while (filelist_cur != NULL){
 		fileInfo *fileinfolist_cur = filelist_cur->fileInfoList->next;
 
@@ -1095,6 +1142,7 @@ void filelist_print_format(fileList *head){
 
 		printf("---- Identical files #%d (%s bytes - %s) ----\n", set_idx++, filesize_w_comma, filelist_cur->hash);
 
+		//list 단위
 		while (fileinfolist_cur != NULL){
 			sec_to_ymdt(localtime(&fileinfolist_cur->statbuf.st_mtime), mtime);
 			sec_to_ymdt(localtime(&fileinfolist_cur->statbuf.st_atime), atime);
@@ -1109,6 +1157,7 @@ void filelist_print_format(fileList *head){
 	}
 }
 
+//md5 해시값 얻기
 int md5(char *target_path, char *hash_result){
 	FILE *fp;
 	unsigned char hash[MD5_DIGEST_LENGTH];
@@ -1137,6 +1186,7 @@ int md5(char *target_path, char *hash_result){
 	return 0;
 }
 
+//BFS 재귀 탐색
 void dir_traverse(dirList *dirlist){
 	dirList *cur = dirlist->next;
 	dirList *subdirs = (dirList *)malloc(sizeof(dirList));
@@ -1181,8 +1231,10 @@ void dir_traverse(dirList *dirlist){
 				continue;
 
 
+			//디렉토리이면 dirlist append
 			if (file_mode == DIRECTORY)
 				dirlist_append(subdirs, fullpath);
+			//정규파일이면 저장
 			else if (file_mode == REGFILE){
 				FILE *fp;
 				char filename[PATHMAX*2];
@@ -1224,6 +1276,7 @@ void dir_traverse(dirList *dirlist){
 
 }
 
+//쓰레드 코드(미구현)
 void *record_thread(void *arg){
 	FILE *fp;
 	struct thread_data *data;
@@ -1246,31 +1299,7 @@ void *record_thread(void *arg){
 	fclose(fp);
 }
 
-void *regfile_thread(void *arg){
-	FILE *fp;
-	char *filename;
-	char *fullpath;
-	char *hash;
-	thread_data *data;
-
-//	pthread_mutex_lock(&mutex);
-	data=(thread_data *)arg;
-	filename=data->filename;
-	fullpath=data->fullpath;
-	hash=data->hash;
-	printf("thread :%s\n",filename);
-	if(hash==NULL)exit(1);
-	if ((fp = fopen(filename, "a")) == NULL){
-		printf("ERROR: fopen error for %s\n", filename);
-	//	return;
-	}
-
-	fprintf(fp, "%s %s\n", hash, fullpath);
-
-	fclose(fp);
-//	pthread_mutex_unlock(&mutex);
-}
-
+//중복 찾기
 void find_duplicates(void){
 	struct dirent **namelist;
 	int listcnt;
@@ -1337,6 +1366,7 @@ void remove_no_duplicates(void){
 	}
 }
 
+//가장 최근 수정한 파일 찾기
 time_t get_recent_mtime(fileInfo *head, char *last_filepath){
 	fileInfo *fileinfo_cur = head->next;
 	time_t mtime = 0;
@@ -1367,6 +1397,7 @@ void delete_prompt(void){
 		fileList *target_filelist_p;
 		fileInfo *target_infolist_p;
 
+		//인자 처리
 		optind=0;
 		printf(">> ");
 
@@ -1445,6 +1476,7 @@ void delete_prompt(void){
 
 		set_idx = atoi(l_argv);
 
+		//f옵션
 		if (flag_f==1){
 			fileInfo *tmp;
 			fileInfo *deleted = target_infolist_p->next;
@@ -1465,6 +1497,7 @@ void delete_prompt(void){
 			filelist_delete_node(dups_list_h, target_filelist_p->hash);
 			printf("Left file in #%d : %s (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
+		//t옵션
 		else if(flag_t==1){
 			FILE *fp;
 			time_t curTime=time(NULL);
@@ -1524,6 +1557,7 @@ void delete_prompt(void){
 			filelist_delete_node(dups_list_h, target_filelist_p->hash);
 			printf("All files in #%d have moved to Trash except \"%s\" (%s)\n\n", atoi(l_argv), last_filepath, modifiedtime);
 		}
+		//i옵션
 		else if(flag_i==1){
 			char ans[STRMAX];
 			fileInfo *fileinfo_cur = target_infolist_p->next;
@@ -1554,6 +1588,7 @@ void delete_prompt(void){
 				filelist_delete_node(dups_list_h, target_filelist_p->hash);
 
 		}
+		//d옵션
 		else if(flag_d==1){
 			fileInfo *deleted;
 			int list_idx;
