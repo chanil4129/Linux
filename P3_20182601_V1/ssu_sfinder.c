@@ -1743,9 +1743,15 @@ int split(char *string, char *seperator, char *argv[]){
 //help
 void command_help(void){
 	printf("Usage:\n > fmd5 -e [FILE_EXTENSION] -l [MINSIZE] -h [MAXSIZE] -d [TARGET_DIRECTORY] -t [THREAD_NUM]\n");
+	printf("      *fmd5 is file dup list find and print*\n");
 	printf("      >> delete -l [SET_INDEX] -d [OPTARG] -i -f -t\n");
+	printf("             *delete is file dup list delete*\n");
+	printf(" > list -l [FILETYPE] -c [CATEGORY] -o [ORDER]\n");
+	printf("      *list is file dup list sort and print*\n");
 	printf(" > trash -c [CATEGORY] -o [ORDER]\n");
+	printf("      *trash is user_trash print*\n");
 	printf(" > restore [RESTORE_INDEX]\n");
+	printf("      *restore is the file trash to origin path*\n");
 	printf(" > help : prompt command explicate\n");
 	printf(" > exit : ssu_sfinder exit\n");
 }
