@@ -25,6 +25,9 @@ int main(void){
 
 	if((val=fcntl(STDOUT_FILENO,F_GETFL,0))<0)
 		serror("fcntl F_GETFL error");
+	val|=O_NONBLOCK;
+	if(fcntl(STDOUT_FILENO,F_SETFL,val)<0)
+		serror("fcntl F_SETFL error");
 
 	for(ptr=buf;nread>0;i++){
 		errno=0;
