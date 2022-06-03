@@ -13,9 +13,8 @@ int main(void){
 	pid_t pid;
 
 	pid=getpid();
-	printf("pid:%d\n",pid);
-	printf("daemon on\n");
-
+	printf("pid : %d\n",pid);
+	printf("daemon init\n");
 	if(ssu_daemon_init()<0){
 		fprintf(stderr,"daemon error\n");
 		exit(1);
@@ -35,20 +34,20 @@ int ssu_daemon_init(void){
 		exit(0);
 
 	pid=getpid();
-	printf("pid :%d\n",pid);
+	printf("pid : %d\n",pid);
 	setsid();
 	signal(SIGTSTP,SIG_IGN);
 	signal(SIGTTIN,SIG_IGN);
 	signal(SIGTTOU,SIG_IGN);
 	maxfd=getdtablesize();
+
 	for(fd=0;fd<maxfd;fd++)
 		close(fd);
 
 	umask(0);
 	chdir("/");
-	fd=open("dev/null",O_RDWR);
+	fd=open("/dev/null",O_RDWR);
 	dup(0);
 	dup(0);
 	return 0;
-
 }

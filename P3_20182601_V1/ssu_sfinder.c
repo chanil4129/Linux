@@ -1193,10 +1193,11 @@ void dir_traverse(dirList *dirlist){
 	pthread_t tid[THREADMAX];
 	int status;
 	t=0;
-
+/*
 	for(int i=0;i<THREADMAX;i++)
 		memset(&thread_data_array[i],0,sizeof(thread_data));
 	memset(subdirs, 0 , sizeof(dirList));
+	*/
 
 	while (cur != NULL){
 		struct dirent **namelist;

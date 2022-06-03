@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 void chan(int signum){
-	printf("sig\n");
+	printf("signal\n");
 }
 
 int main(void){

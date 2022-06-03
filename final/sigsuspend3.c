@@ -10,6 +10,7 @@ void ssu_timestamp(char *str);
 int main(void) {
 	struct sigaction sig_act;
 	sigset_t blk_set;
+
 	sigfillset(&blk_set);
 	sigdelset(&blk_set, SIGALRM);
 	sigemptyset(&sig_act.sa_mask);
