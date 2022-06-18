@@ -1,0 +1,7 @@
+reading 10945 bytes
+nwrite=9729, errno=0
+nwrite=-1, errno=11
+nwrite=-1, errno=11
+nwrite=-1, errno=11
+nwrite=-1, errno=11
+nwrite=1216, errno=0
